@@ -1,4 +1,4 @@
-import { playNormalCard, playEliteCard, playUnderlayAce, executeCombat, executeAttackPlayer, healCharacter, endTurn } from './gameEngine';
+import { playNormalCard, playEliteCard, playUnderlayAce, executeCombat, executeAttackPlayer, healCharacter, endTurn } from './gameEngine.js';
 
 // Main AI trigger called during the gameplay loop when it is B's turn
 export function runAiGameplayTurn(state, updateStateCallback) {

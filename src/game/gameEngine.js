@@ -1,4 +1,4 @@
-import { SUBSECTIONS, createCard, buildDeck, getPairedSubsectionId, generateElites } from './deckBuilder';
+import { SUBSECTIONS, createCard, buildDeck, getPairedSubsectionId, generateElites } from './deckBuilder.js';
 
 export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
   return {
@@ -8,6 +8,7 @@ export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
     
     // Draft state
     draft: {
+      startingPlayer, // Track who starts draft first
       availableSubsections: [...SUBSECTIONS],
       currentDrafter: startingPlayer, // 'A' or 'B'
       step: 1, // 1 to 4 for normal draft
@@ -176,17 +177,20 @@ export function draftNormalSubsection(state, subsectionId) {
   
   logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} drafted Even subsection ${selectedSub.id.split('_')[0].toUpperCase()}. Paired Odd goes to other player.`);
   
-  // Advancing steps
+  const starter = draftState.startingPlayer || 'A';
+  const follower = starter === 'A' ? 'B' : 'A';
+
+  // Advancing steps dynamically
   if (draftState.step === 1) {
     draftState.step = 2;
-    draftState.currentDrafter = 'B';
+    draftState.currentDrafter = follower;
   } else if (draftState.step === 2) {
-    // Step 2 needs 2 selections by B
+    // Step 2 needs 2 selections by follower
     const remainingEvens = draftState.availableSubsections.filter(s => s.type === 'even');
     if (remainingEvens.length === 2) {
-      draftState.currentDrafter = 'B'; // Need 1 more choice from B
+      draftState.currentDrafter = follower; // Need 1 more choice from follower
     } else {
-      // B finished drafting both. Now auto-assign last Even to Player A
+      // Follower finished drafting both. Now auto-assign last Even to starter
       const lastEven = remainingEvens[0];
       const lastPairedId = getPairedSubsectionId(lastEven.id);
       const lastPair = draftState.availableSubsections.find(s => s.id === lastPairedId);
@@ -194,10 +198,15 @@ export function draftNormalSubsection(state, subsectionId) {
       const lastEvenCards = lastEven.cards.map(v => createCard(lastEven.suit, v, false));
       const lastOddCards = lastPair.cards.map(v => createCard(lastPair.suit, v, false));
       
-      draftState.playerANormals.push(...lastEvenCards);
-      draftState.playerBNormals.push(...lastOddCards);
+      if (starter === 'A') {
+        draftState.playerANormals.push(...lastEvenCards);
+        draftState.playerBNormals.push(...lastOddCards);
+      } else {
+        draftState.playerBNormals.push(...lastEvenCards);
+        draftState.playerANormals.push(...lastOddCards);
+      }
       
-      logEvent(state, `Player A automatically receives remaining Even subsection ${lastEven.id.split('_')[0].toUpperCase()}. Paired Odd goes to Player B.`);
+      logEvent(state, `${starter === 'A' ? 'Player A' : 'Player B'} automatically receives remaining Even subsection ${lastEven.id.split('_')[0].toUpperCase()}. Paired Odd goes to ${follower === 'A' ? 'Player A' : 'Player B'}.`);
       
       // Clear pool
       draftState.availableSubsections = [];
@@ -205,8 +214,8 @@ export function draftNormalSubsection(state, subsectionId) {
       // Transition to Elites!
       state.phase = 'DRAFT_ELITE';
       draftState.currentEliteCategory = null; // Any category can be selected first
-      draftState.eliteCategorySelector = 'A'; // A starts picking first normal and first elite
-      draftState.currentDrafter = 'A';
+      draftState.eliteCategorySelector = starter; // Starter of normal cards starts again in elite cards!
+      draftState.currentDrafter = starter;
       draftState.eliteDraftStep = 1;
     }
   }
@@ -365,12 +374,14 @@ function initializeGameDecks(state) {
   drawInitialHand(state, 'B');
   
   state.phase = 'GAMEPLAY';
-  state.activePlayer = 'A';
+  const gameplayStarter = state.draft.startingPlayer || 'A';
+  state.activePlayer = gameplayStarter;
   state.turnCount = 1;
   
-  logEvent(state, "Game initialized! Starting hand drawn (no Elites). Turn 1 starts for Player A.");
+  const starterName = gameplayStarter === 'A' ? 'Player A' : (state.mode === 'ai' ? 'Computer (AI)' : 'Player B');
+  logEvent(state, `Game initialized! Starting hand drawn (no Elites). Turn 1 starts for ${starterName}.`);
   
-  // Start Turn for A
+  // Start Turn for starter
   startTurn(state);
 }
 

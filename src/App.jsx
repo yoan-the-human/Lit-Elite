@@ -71,6 +71,7 @@ function playSound(type) {
 export default function App() {
   const [gameState, setGameState] = useState(null);
   const [isTurnHandoffActive, setIsTurnHandoffActive] = useState(false);
+  const [showAiFirstChoice, setShowAiFirstChoice] = useState(false);
 
   // Trigger sound when card counts change (for draws) or logs update
   useEffect(() => {
@@ -91,13 +92,25 @@ export default function App() {
   }, [gameState?.logs?.length]);
 
   // Start game action
-  const handleStartGame = (mode) => {
-    // Coin flip for starting player
-    const startingPlayer = Math.random() < 0.5 ? 'A' : 'B';
+  const handleStartGame = (mode, forcedStartingPlayer = null) => {
+    let startingPlayer = forcedStartingPlayer;
+    let methodMsg = "";
+    if (mode === 'ai') {
+      if (!startingPlayer) {
+        startingPlayer = Math.random() < 0.5 ? 'A' : 'B';
+        methodMsg = `Coin flipped: ${startingPlayer === 'A' ? 'Player A' : 'Computer (AI)'} goes first!`;
+      } else {
+        methodMsg = `${startingPlayer === 'A' ? 'Player A' : 'Computer (AI)'} starts the draft.`;
+      }
+    } else {
+      startingPlayer = Math.random() < 0.5 ? 'A' : 'B';
+      methodMsg = `Coin flipped: ${startingPlayer === 'A' ? 'Player A' : 'Player B'} goes first!`;
+    }
     const state = getInitialGameState(mode, startingPlayer);
     
-    state.logs.push(`Coin flipped: ${startingPlayer === 'A' ? 'Player A' : 'Player B'} goes first!`);
+    state.logs.push(methodMsg);
     setGameState(state);
+    setShowAiFirstChoice(false);
   };
 
   // Draft Phase Actions
@@ -229,16 +242,36 @@ export default function App() {
           Siberian-Grade 1v1 Card Combat. Assemble your deck through Odd/Even drafting, space your Elites, and command custom card powers to crush opponent LP.
         </p>
         
-        <div className="mode-choices">
-          <div className="glass-panel mode-card" onClick={() => handleStartGame('hotseat')}>
-            <h3>Pass & Play (Hotseat)</h3>
-            <p>1v1 battle on the same computer. Full screen blockers hide hands between turns.</p>
+        {showAiFirstChoice ? (
+          <div className="glass-panel mode-card" style={{ maxWidth: '500px', width: '100%', cursor: 'default' }}>
+            <h3 style={{ marginBottom: '16px', color: 'var(--text-bright)' }}>Who drafts first, comrade?</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <button className="btn-premium btn-spades" style={{ justifyContent: 'center' }} onClick={() => handleStartGame('ai', 'A')}>
+                I Draft First (Player A)
+              </button>
+              <button className="btn-premium btn-hearts" style={{ justifyContent: 'center' }} onClick={() => handleStartGame('ai', 'B')}>
+                AI Drafts First (Player B)
+              </button>
+              <button className="btn-premium btn-diamonds" style={{ justifyContent: 'center' }} onClick={() => handleStartGame('ai', null)}>
+                Coin Flip (Let Chance Decide)
+              </button>
+              <button className="btn-premium btn-clubs" style={{ marginTop: '8px', justifyContent: 'center' }} onClick={() => setShowAiFirstChoice(false)}>
+                ← Back
+              </button>
+            </div>
           </div>
-          <div className="glass-panel mode-card" onClick={() => handleStartGame('ai')}>
-            <h3>Vs Computer (AI)</h3>
-            <p>Play against the custom automated AI player. Perfect for testing and practicing.</p>
+        ) : (
+          <div className="mode-choices">
+            <div className="glass-panel mode-card" onClick={() => handleStartGame('hotseat')}>
+              <h3>Pass & Play (Hotseat)</h3>
+              <p>1v1 battle on the same computer. Full screen blockers hide hands between turns.</p>
+            </div>
+            <div className="glass-panel mode-card" onClick={() => setShowAiFirstChoice(true)}>
+              <h3>Vs Computer (AI)</h3>
+              <p>Play against the custom automated AI player. Perfect for testing and practicing.</p>
+            </div>
           </div>
-        </div>
+        )}
         
         <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
           Version 1.0.0 (Offline Mode) • Glory to the Motherland!
