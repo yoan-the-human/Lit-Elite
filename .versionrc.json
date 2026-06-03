@@ -1,0 +1,18 @@
+{
+  "header": "# Списък с промени\n\nВсички забележителни промени в този проект ще бъдат документирани в този файл.\n",
+  "commitUrlFormat": "https://github.com/yoan-the-human/morld/commit/{{hash}}",
+  "compareUrlFormat": "https://github.com/yoan-the-human/morld/compare/{{previousTag}}...{{currentTag}}",
+  "types": [
+    { "type": "new", "section": "🚀 Новости" },
+    { "type": "bug", "section": "🐛 Бъгове" },
+    { "type": "improve", "section": "⚡ Подобрения" },
+    { "type": "revert", "section": "⏪ Отменяна" },
+    { "type": "service", "section": "🔧 Поддръжка" },
+    { "type": "docs", "section": "📚 Документация" },
+    { "type": "style", "section": "💄 Стил" },
+    { "type": "refactor", "section": "♻️ Структура" },
+    { "type": "test", "hidden": true },
+    { "type": "build", "hidden": true },
+    { "type": "ci", "hidden": true }
+  ]
+}

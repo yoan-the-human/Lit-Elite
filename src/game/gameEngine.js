@@ -1,0 +1,1132 @@
+import { SUBSECTIONS, createCard, buildDeck, getPairedSubsectionId, generateElites } from './deckBuilder';
+
+export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
+  return {
+    mode, // 'hotseat' or 'ai'
+    phase: 'DRAFT_NORMAL', // 'DRAFT_NORMAL', 'DRAFT_ELITE', 'DRAFT_ELITE_SELECT', 'GAMEPLAY', 'GAME_OVER'
+    winner: null,
+    
+    // Draft state
+    draft: {
+      availableSubsections: [...SUBSECTIONS],
+      currentDrafter: startingPlayer, // 'A' or 'B'
+      step: 1, // 1 to 4 for normal draft
+      playerANormals: [], // drafted normal card values (card objects)
+      playerBNormals: [],
+      
+      // Elite draft
+      availableElites: generateElites(),
+      eliteDraftStep: 1, // Increments for turns in categories
+      currentEliteCategory: 'K', // 'K', 'Q', 'J', 'A'
+      draftedElitesA: [], // All drafted elites for A (up to 8)
+      draftedElitesB: [], // All drafted elites for B (up to 8)
+      
+      // Elite final selection (selecting 4 from 8)
+      finalElitesA: [], // Chosen 4 Elites
+      finalElitesB: [],
+      selectionTurn: startingPlayer // Who is currently choosing their final 4 elites
+    },
+    
+    // Players state
+    players: {
+      A: {
+        id: 'A',
+        name: 'Player A',
+        lp: 150,
+        deck: [],
+        hand: [],
+        board: [],
+        defeated: [], // Defeated Pile (FIFO queue)
+        has10CardBuff: false,
+        cardsPlayedThisTurn: 0
+      },
+      B: {
+        id: 'B',
+        name: mode === 'ai' ? 'Computer (AI)' : 'Player B',
+        lp: 150,
+        deck: [],
+        hand: [],
+        board: [],
+        defeated: [],
+        has10CardBuff: false,
+        cardsPlayedThisTurn: 0
+      }
+    },
+    
+    activePlayer: startingPlayer, // 'A' or 'B'
+    turnCount: 1,
+    defeatedDrawsCount: { A: 0, B: 0 }, // fatigue counters
+    resurrectionCandidate: null, // { card, threshold }
+    logs: [],
+    
+    // Actions requiring user selection
+    pendingPlay: null // { card, powerIndex, sourceIndex }
+  };
+}
+
+// Log utility
+export function logEvent(state, message) {
+  state.logs.push(`[Turn ${state.turnCount} - ${state.activePlayer === 'A' ? 'P1' : 'P2'}]: ${message}`);
+}
+
+// Check and update the 10-card hand buff state for both players
+export function update10CardBuff(playerState) {
+  if (playerState.hand.length === 10) {
+    if (!playerState.has10CardBuff) {
+      playerState.has10CardBuff = true;
+    }
+  } else if (playerState.hand.length <= 6) {
+    if (playerState.has10CardBuff) {
+      playerState.has10CardBuff = false;
+    }
+  }
+}
+
+// Draw card function
+export function drawCard(state, player) {
+  const pState = state.players[player];
+  
+  if (pState.deck.length === 0) {
+    // Defeated Pile (FIFO Queue) draw
+    if (pState.defeated.length > 0) {
+      const card = pState.defeated.shift();
+      state.defeatedDrawsCount[player] += 1;
+      const fatigueDamage = state.defeatedDrawsCount[player];
+      pState.lp = Math.max(0, pState.lp - fatigueDamage);
+      
+      // Reset card stats when drawn back
+      card.atk = card.baseAtk;
+      card.hp = card.baseHp;
+      card.maxHp = card.baseHp;
+      card.shield = false;
+      card.isTank = false;
+      card.stunnedTurns = 0;
+      card.underlays = [];
+      card.attackedThisTurn = 0;
+      card.hasHaste = false;
+      
+      pState.hand.push(card);
+      logEvent(state, `${pState.name} draws ${card.isElite ? 'Elite' : 'Normal'} ${card.suit.toUpperCase()} ${card.rank || card.value} from DEFEATED pile, taking ${fatigueDamage} fatigue damage!`);
+      update10CardBuff(pState);
+      
+      if (pState.lp <= 0) {
+        state.winner = player === 'A' ? 'B' : 'A';
+        state.phase = 'GAME_OVER';
+        logEvent(state, `${pState.name} died to fatigue damage. Game Over!`);
+      }
+    } else {
+      // Empty defeated pile as well: just take fatigue damage
+      state.defeatedDrawsCount[player] += 1;
+      const fatigueDamage = state.defeatedDrawsCount[player];
+      pState.lp = Math.max(0, pState.lp - fatigueDamage);
+      logEvent(state, `${pState.name} tried to draw but deck and defeated piles are empty! Takes ${fatigueDamage} fatigue damage!`);
+      
+      if (pState.lp <= 0) {
+        state.winner = player === 'A' ? 'B' : 'A';
+        state.phase = 'GAME_OVER';
+        logEvent(state, `${pState.name} died to fatigue damage. Game Over!`);
+      }
+    }
+    return;
+  }
+  
+  const card = pState.deck.shift();
+  pState.hand.push(card);
+  logEvent(state, `${pState.name} draws a card.`);
+  update10CardBuff(pState);
+}
+
+// Normal Subsection Drafting
+export function draftNormalSubsection(state, subsectionId) {
+  if (state.phase !== 'DRAFT_NORMAL') return state;
+  
+  const draftState = state.draft;
+  const currentDrafter = draftState.currentDrafter;
+  const opponent = currentDrafter === 'A' ? 'B' : 'A';
+  
+  const subIdx = draftState.availableSubsections.findIndex(s => s.id === subsectionId);
+  if (subIdx === -1) return state;
+  
+  const selectedSub = draftState.availableSubsections[subIdx];
+  
+  // Find paired subsection
+  const pairedSubId = getPairedSubsectionId(subsectionId);
+  const pairIdx = draftState.availableSubsections.findIndex(s => s.id === pairedSubId);
+  const pairedSub = draftState.availableSubsections[pairIdx];
+  
+  // Create card objects
+  const selectedCards = selectedSub.cards.map(v => createCard(selectedSub.suit, v, false));
+  const pairedCards = pairedSub.cards.map(v => createCard(pairedSub.suit, v, false));
+  
+  if (currentDrafter === 'A') {
+    draftState.playerANormals.push(...selectedCards);
+    draftState.playerBNormals.push(...pairedCards);
+  } else {
+    draftState.playerBNormals.push(...selectedCards);
+    draftState.playerANormals.push(...pairedCards);
+  }
+  
+  // Remove from available (remove higher index first to preserve correct splicing)
+  const firstIdx = Math.max(subIdx, pairIdx);
+  const secondIdx = Math.min(subIdx, pairIdx);
+  draftState.availableSubsections.splice(firstIdx, 1);
+  draftState.availableSubsections.splice(secondIdx, 1);
+  
+  logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} drafted ${selectedSub.id} (${selectedCards.length} cards). Paired ${pairedSub.id} goes to other player.`);
+  
+  // Advancing steps
+  if (draftState.step === 1) {
+    draftState.step = 2;
+    draftState.currentDrafter = 'B';
+  } else if (draftState.step === 2) {
+    // Step 2 needs 2 selections by B
+    const bDraftedCount = currentDrafter === 'A' ? draftState.playerBNormals.length : draftState.playerBNormals.length; 
+    // Just count remaining subsections: 8 total. 1 pair chosen in step 1.
+    // If 4 subsections remaining, B has made 1 choice in step 2. We need 1 more choice from B.
+    if (draftState.availableSubsections.length === 4) {
+      draftState.currentDrafter = 'B';
+    } else {
+      // B has drafted both in step 2. Now A's turn in step 3.
+      draftState.step = 3;
+      draftState.currentDrafter = 'A';
+    }
+  } else if (draftState.step === 3) {
+    // Step 3 needs 2 selections by A
+    if (draftState.availableSubsections.length === 2) {
+      draftState.currentDrafter = 'A';
+    } else {
+      draftState.step = 4;
+      draftState.currentDrafter = 'B';
+    }
+  } else if (draftState.step === 4) {
+    // Done with normal drafting. Move to Elites!
+    state.phase = 'DRAFT_ELITE';
+    draftState.currentDrafter = 'A';
+    draftState.eliteDraftStep = 1;
+    draftState.currentEliteCategory = 'K';
+  }
+  
+  return state;
+}
+
+// Elite Drafting
+export function draftEliteCard(state, cardId) {
+  if (state.phase !== 'DRAFT_ELITE') return state;
+  
+  const draftState = state.draft;
+  const currentDrafter = draftState.currentDrafter;
+  const category = draftState.currentEliteCategory;
+  
+  const cardIdx = draftState.availableElites.findIndex(c => c.id === cardId);
+  if (cardIdx === -1) return state;
+  
+  const card = draftState.availableElites[cardIdx];
+  if (card.rank !== category) return state; // Must draft matching rank category
+  
+  // Assign card
+  if (currentDrafter === 'A') {
+    draftState.draftedElitesA.push(card);
+  } else {
+    draftState.draftedElitesB.push(card);
+  }
+  draftState.availableElites.splice(cardIdx, 1);
+  logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} drafted Elite ${card.rank} of ${card.suit.toUpperCase()}`);
+  
+  // Category transition logic (A-Bx2-A auto, etc.)
+  draftState.eliteDraftStep += 1;
+  const step = draftState.eliteDraftStep;
+  
+  if (category === 'K' || category === 'J') {
+    // Kings and Jacks: A -> B -> B -> (A remaining)
+    if (step === 2) {
+      draftState.currentDrafter = 'B';
+    } else if (step === 3) {
+      draftState.currentDrafter = 'B';
+    } else if (step === 4) {
+      // Remaining card goes to A automatically
+      const remainingIdx = draftState.availableElites.findIndex(c => c.rank === category);
+      if (remainingIdx !== -1) {
+        const remainingCard = draftState.availableElites[remainingIdx];
+        draftState.draftedElitesA.push(remainingCard);
+        draftState.availableElites.splice(remainingIdx, 1);
+        logEvent(state, `Player A automatically receives remaining Elite ${remainingCard.rank} of ${remainingCard.suit.toUpperCase()}`);
+      }
+      
+      // Advance category
+      draftState.eliteDraftStep = 1;
+      draftState.currentEliteCategory = category === 'K' ? 'Q' : 'A';
+      draftState.currentDrafter = category === 'K' ? 'B' : 'B';
+    }
+  } else if (category === 'Q' || category === 'A') {
+    // Queens and Aces: B -> A -> A -> (B remaining)
+    if (step === 2) {
+      draftState.currentDrafter = 'A';
+    } else if (step === 3) {
+      draftState.currentDrafter = 'A';
+    } else if (step === 4) {
+      // Remaining card goes to B automatically
+      const remainingIdx = draftState.availableElites.findIndex(c => c.rank === category);
+      if (remainingIdx !== -1) {
+        const remainingCard = draftState.availableElites[remainingIdx];
+        draftState.draftedElitesB.push(remainingCard);
+        draftState.availableElites.splice(remainingIdx, 1);
+        logEvent(state, `Player B automatically receives remaining Elite ${remainingCard.rank} of ${remainingCard.suit.toUpperCase()}`);
+      }
+      
+      // Advance category
+      draftState.eliteDraftStep = 1;
+      if (category === 'Q') {
+        draftState.currentEliteCategory = 'J';
+        draftState.currentDrafter = 'A';
+      } else {
+        // Elite drafting fully done! Players must select their final 4 elites.
+        state.phase = 'DRAFT_ELITE_SELECT';
+        draftState.selectionTurn = 'A';
+      }
+    }
+  }
+  
+  return state;
+}
+
+// Select Final 4 Elites
+export function selectFinalElites(state, player, cardIds) {
+  if (state.phase !== 'DRAFT_ELITE_SELECT') return state;
+  const draftState = state.draft;
+  
+  if (player !== draftState.selectionTurn) return state;
+  
+  // Validate selected card IDs
+  const pool = player === 'A' ? draftState.draftedElitesA : draftState.draftedElitesB;
+  const chosenElites = pool.filter(c => cardIds.includes(c.id));
+  
+  // Ensure player selected exactly 1 of each J, Q, K, A
+  const ranks = chosenElites.map(c => c.rank);
+  const isValid = chosenElites.length === 4 && 
+                  ranks.includes('J') && 
+                  ranks.includes('Q') && 
+                  ranks.includes('K') && 
+                  ranks.includes('A');
+                  
+  if (!isValid) return state;
+  
+  if (player === 'A') {
+    draftState.finalElitesA = chosenElites;
+    draftState.selectionTurn = 'B';
+    logEvent(state, `Player A selected their 4 Elite cards.`);
+    
+    // If VS AI, AI instantly selects
+    if (state.mode === 'ai') {
+      aiSelectFinalElites(state);
+    }
+  } else {
+    draftState.finalElitesB = chosenElites;
+    logEvent(state, `Player B selected their 4 Elite cards.`);
+    
+    // Both done selecting. Build decks and start!
+    initializeGameDecks(state);
+  }
+  
+  return state;
+}
+
+// Simple AI selection of final elites (take first matching of each category)
+function aiSelectFinalElites(state) {
+  const pool = state.draft.draftedElitesB;
+  const selection = [];
+  ['J', 'Q', 'K', 'A'].forEach(r => {
+    const card = pool.find(c => c.rank === r);
+    if (card) selection.push(card.id);
+  });
+  selectFinalElites(state, 'B', selection);
+}
+
+// Deck initialization after selection
+function initializeGameDecks(state) {
+  const pA = state.players.A;
+  const pB = state.players.B;
+  
+  pA.deck = buildDeck(state.draft.playerANormals, state.draft.finalElitesA);
+  pB.deck = buildDeck(state.draft.playerBNormals, state.draft.finalElitesB);
+  
+  logEvent(state, "Decks built using spacing constraint. Shuffling normal and elite pools.");
+  
+  // Initial draw: 6 cards, must not include Elites
+  drawInitialHand(state, 'A');
+  drawInitialHand(state, 'B');
+  
+  state.phase = 'GAMEPLAY';
+  state.activePlayer = 'A';
+  state.turnCount = 1;
+  
+  logEvent(state, "Game initialized! Starting hand drawn (no Elites). Turn 1 starts for Player A.");
+  
+  // Start Turn for A
+  startTurn(state);
+}
+
+// Initial draw helper: draws the first 6 normal cards, leaving elites in their relative slots
+function drawInitialHand(state, player) {
+  const pState = state.players[player];
+  let normalsDrawn = 0;
+  const remainingDeck = [];
+  
+  for (let i = 0; i < pState.deck.length; i++) {
+    const card = pState.deck[i];
+    if (!card.isElite && normalsDrawn < 6) {
+      pState.hand.push(card);
+      normalsDrawn += 1;
+    } else {
+      remainingDeck.push(card);
+    }
+  }
+  pState.deck = remainingDeck;
+  update10CardBuff(pState);
+}
+
+// Start Turn
+export function startTurn(state) {
+  const active = state.activePlayer;
+  const pState = state.players[active];
+  
+  pState.cardsPlayedThisTurn = 0;
+  pState.underlaysPlayedThisTurn = 0;
+  
+  // Stun tick: reduce stunned turns for friendly board cards
+  pState.board.forEach(card => {
+    card.attackedThisTurn = 0; // reset attack counters
+    if (card.stunnedTurns > 0) {
+      card.stunnedTurns -= 1;
+      if (card.stunnedTurns === 0) {
+        logEvent(state, `${card.isElite ? 'Elite' : 'Normal'} ${card.suit.toUpperCase()} ${card.rank || card.value} recovered from stun.`);
+      }
+    }
+  });
+  
+  // Draw card step
+  if (pState.has10CardBuff) {
+    logEvent(state, `${pState.name} is in 10-Card Hand Buff state. Draw phase is FROZEN!`);
+  } else {
+    drawCard(state, active);
+  }
+  
+  return state;
+}
+
+// End Turn
+export function endTurn(state) {
+  const active = state.activePlayer;
+  const pState = state.players[active];
+  
+  // End of turn cleanup: Restore all surviving board cards back to max HP
+  pState.board.forEach(c => {
+    if (c.hp < c.maxHp) {
+      c.hp = c.maxHp;
+    }
+    // Shields do not decay, they stay until broken
+  });
+  
+  // Opponent board cleanup (just in case)
+  const opponent = active === 'A' ? 'B' : 'A';
+  state.players[opponent].board.forEach(c => {
+    if (c.hp < c.maxHp) {
+      c.hp = c.maxHp;
+    }
+  });
+  
+  logEvent(state, `${pState.name} ends turn. Surviving board cards fully restored to max HP.`);
+  
+  // Clear resurrection candidate at end of turn
+  state.resurrectionCandidate = null;
+  
+  // Switch player
+  state.activePlayer = opponent;
+  if (opponent === 'A') {
+    state.turnCount += 1;
+  }
+  
+  // Start turn for new active player
+  startTurn(state);
+  
+  // If VS AI and it's AI's turn, execute AI turn
+  if (state.mode === 'ai' && state.activePlayer === 'B' && state.phase === 'GAMEPLAY') {
+    // AI turn logic will be triggered in the component or App coordinator
+  }
+  
+  return state;
+}
+
+// Healing helper with overheal logic
+export function healCharacter(state, player, target, healAmount) {
+  // If resurrection candidate is valid, heal card trigger resurrection
+  if (state.resurrectionCandidate) {
+    const candidate = state.resurrectionCandidate;
+    if (healAmount > candidate.threshold) {
+      const defPile = state.players[player].defeated;
+      const cardIdx = defPile.findIndex(c => c.id === candidate.card.id);
+      if (cardIdx !== -1) {
+        const card = defPile[cardIdx];
+        defPile.splice(cardIdx, 1);
+        
+        // Restore stats
+        card.hp = card.maxHp;
+        card.atk = card.baseAtk;
+        card.isTank = false;
+        card.shield = false;
+        card.stunnedTurns = 0;
+        card.underlays = [];
+        
+        state.players[player].board.push(card);
+        logEvent(state, `RESURRECTION! Friendly ${card.suit.toUpperCase()} ${card.rank || card.value} immediately resurrected to board!`);
+        state.resurrectionCandidate = null;
+      }
+    }
+  }
+
+  if (target === 'player') {
+    const pState = state.players[player];
+    const prevLp = pState.lp;
+    pState.lp += healAmount;
+    
+    if (pState.lp > 150) {
+      const excess = pState.lp - 150;
+      pState.lp = 150;
+      // Excess damage to opponent LP
+      const opp = player === 'A' ? 'B' : 'A';
+      state.players[opp].lp = Math.max(0, state.players[opp].lp - excess);
+      logEvent(state, `${pState.name} healed for ${healAmount}. LP capped at 150. Excess ${excess} damage dealt to opponent's LP!`);
+      
+      if (state.players[opp].lp <= 0) {
+        state.winner = player;
+        state.phase = 'GAME_OVER';
+        logEvent(state, `${state.players[opp].name} has fallen! Game Over.`);
+      }
+    } else {
+      logEvent(state, `${pState.name} healed LP for ${healAmount} (LP: ${prevLp} -> ${pState.lp}).`);
+    }
+  } else {
+    // Target is card object
+    const prevHp = target.hp;
+    target.hp = Math.min(target.maxHp, target.hp + healAmount);
+    logEvent(state, `Friendly ${target.suit.toUpperCase()} ${target.rank || target.value} healed for ${healAmount} (HP: ${prevHp} -> ${target.hp}).`);
+  }
+}
+
+// Normal Card Play Resolver
+export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
+  const active = state.activePlayer;
+  const pState = state.players[active];
+  const opp = active === 'A' ? 'B' : 'A';
+  const oppState = state.players[opp];
+  
+  if (pState.has10CardBuff && pState.cardsPlayedThisTurn >= 3) {
+    logEvent(state, `Cannot play card. Exceeded play limit (3 cards) of 10-Card Hand Buff!`);
+    return state;
+  }
+  
+  const cardIdx = pState.hand.findIndex(c => c.id === cardId);
+  if (cardIdx === -1) return state;
+  const card = pState.hand[cardIdx];
+  
+  // Resolve powers
+  const isDual = pState.has10CardBuff;
+  
+  // Remove card from hand
+  pState.hand.splice(cardIdx, 1);
+  pState.cardsPlayedThisTurn += 1;
+  
+  logEvent(state, `Plays Normal Card: ${card.suit.toUpperCase()} ${card.value}${isDual ? ' [DUAL ACTIVATION]' : ''}`);
+  
+  // Store powers to execute
+  const powersToRun = [];
+  if (isDual) {
+    powersToRun.push(1, 2);
+  } else {
+    powersToRun.push(powerIndex);
+  }
+  
+  // Flag to check if card survives play (like Clubs Detonate kills it)
+  let shouldPlaceOnBoard = true;
+  
+  powersToRun.forEach(power => {
+    if (card.suit === 'diamonds') {
+      if (power === 1) {
+        // Draw 1
+        drawCard(state, active);
+      } else {
+        // Strike (Haste)
+        card.hasHaste = true;
+        logEvent(state, `${card.suit.toUpperCase()} ${card.value} gains Strike (Haste/Charge).`);
+      }
+    } else if (card.suit === 'hearts') {
+      if (power === 1) {
+        // Heal
+        const healAmt = card.value;
+        if (targetInfo === 'player' || !targetInfo) {
+          healCharacter(state, active, 'player', healAmt);
+        } else {
+          // Card target
+          const targetCard = pState.board.find(c => c.id === targetInfo);
+          if (targetCard) {
+            healCharacter(state, active, targetCard, healAmt);
+          } else {
+            // Default to player if card targets not found
+            healCharacter(state, active, 'player', healAmt);
+          }
+        }
+      } else {
+        // Damage opponent
+        oppState.lp = Math.max(0, oppState.lp - card.value);
+        logEvent(state, `Direct damage: Deals ${card.value} damage to opponent's LP (Opponent LP: ${oppState.lp}).`);
+        if (oppState.lp <= 0) {
+          state.winner = active;
+          state.phase = 'GAME_OVER';
+          logEvent(state, `${oppState.name} has fallen! Game Over.`);
+        }
+      }
+    } else if (card.suit === 'spades') {
+      if (power === 1) {
+        // Tank
+        card.isTank = true;
+        logEvent(state, `${card.suit.toUpperCase()} ${card.value} is placed forward as a Tank!`);
+      } else {
+        // Stun enemy card
+        if (targetInfo) {
+          const enemyCard = oppState.board.find(c => c.id === targetInfo);
+          if (enemyCard) {
+            enemyCard.stunnedTurns = 1;
+            logEvent(state, `Stuns enemy card ${enemyCard.suit.toUpperCase()} ${enemyCard.rank || enemyCard.value} for 1 turn.`);
+          }
+        }
+      }
+    } else if (card.suit === 'clubs') {
+      if (power === 1) {
+        // Detonate: deal value to all enemy board cards, then self-destructs
+        shouldPlaceOnBoard = false;
+        logEvent(state, `DETONATES! Deals ${card.value} damage to all enemy board cards.`);
+        
+        // Loop backwards to handle defeated cards safely
+        for (let i = oppState.board.length - 1; i >= 0; i--) {
+          const ec = oppState.board[i];
+          
+          // Shield check
+          if (ec.shield) {
+            const shieldThreshold = ec.value; // Elite's shield threshold is its value
+            if (card.value > shieldThreshold) {
+              ec.shield = false;
+              ec.hp -= card.value;
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield breaks! Takes ${card.value} damage.`);
+            } else {
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield absorbs detonation damage.`);
+            }
+          } else {
+            ec.hp -= card.value;
+            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} takes ${card.value} damage.`);
+          }
+          
+          if (ec.hp <= 0) {
+            oppState.board.splice(i, 1);
+            oppState.defeated.push(ec);
+            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by detonation!`);
+          }
+        }
+        
+        // Place detonate card in def pile
+        pState.defeated.push(card);
+      } else {
+        // Resurrect Less: summon Clubs card from def pile with strictly less value than this card's value.
+        // Highest value is summoned first (strongest).
+        const eligible = pState.defeated
+          .filter(c => c.suit === 'clubs' && c.value < card.value)
+          .sort((a, b) => b.value - a.value);
+          
+        if (eligible.length > 0) {
+          const resCard = eligible[0];
+          const idx = pState.defeated.findIndex(c => c.id === resCard.id);
+          pState.defeated.splice(idx, 1);
+          
+          // Reduce both stats by 1 (min 1)
+          resCard.atk = Math.max(1, resCard.baseAtk - 1);
+          resCard.hp = Math.max(1, resCard.baseHp - 1);
+          resCard.maxHp = Math.max(1, resCard.baseHp - 1);
+          resCard.shield = false;
+          resCard.isTank = false;
+          resCard.stunnedTurns = 0;
+          resCard.underlays = [];
+          
+          pState.board.push(resCard);
+          logEvent(state, `Resurrect Less: Summons ${resCard.suit.toUpperCase()} ${resCard.value} with stats ${resCard.atk}/${resCard.hp} to board.`);
+        } else {
+          logEvent(state, `Resurrect Less activated, but no Clubs cards under value ${card.value} found in Defeated Pile.`);
+        }
+      }
+    }
+  });
+  
+  if (shouldPlaceOnBoard) {
+    pState.board.push(card);
+  }
+  
+  update10CardBuff(pState);
+  state.pendingPlay = null;
+  return state;
+}
+
+// Elite Card Play Resolver
+export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = null) {
+  const active = state.activePlayer;
+  const pState = state.players[active];
+  const opp = active === 'A' ? 'B' : 'A';
+  const oppState = state.players[opp];
+  
+  const cardIdx = pState.hand.findIndex(c => c.id === cardId);
+  if (cardIdx === -1) return state;
+  const card = pState.hand[cardIdx];
+  
+  pState.hand.splice(cardIdx, 1);
+  pState.cardsPlayedThisTurn += 1;
+  
+  logEvent(state, `Plays Elite Card: ${card.rank} of ${card.suit.toUpperCase()}`);
+  
+  let shouldPlaceOnBoard = true;
+  
+  // Resolve Elite powers based on suit and rank
+  resolveEliteAbility(state, active, card, card.suit, chosenAbilityIndex, extraParams, () => {
+    // Callback: if card is Ace underlay or Board wiped, handle board status
+    if (extraParams && extraParams.isUnderlay) {
+      shouldPlaceOnBoard = false;
+    }
+  });
+  
+  if (shouldPlaceOnBoard) {
+    pState.board.push(card);
+  }
+  
+  update10CardBuff(pState);
+  state.pendingPlay = null;
+  return state;
+}
+
+// Underlay resolution: Ace under active elite
+export function playUnderlayAce(state, aceId, targetEliteId, chosenAbilityIndex, extraParams = null) {
+  const active = state.activePlayer;
+  const pState = state.players[active];
+  
+  const aceIdx = pState.hand.findIndex(c => c.id === aceId);
+  if (aceIdx === -1) return state;
+  const ace = pState.hand[aceIdx];
+  
+  const targetElite = pState.board.find(c => c.id === targetEliteId);
+  if (!targetElite || !targetElite.isElite) return state;
+  
+  // Remove Ace from hand
+  pState.hand.splice(aceIdx, 1);
+  pState.underlaysPlayedThisTurn += 1;
+  
+  // Attach Ace under Target Elite
+  targetElite.underlays.push(ace);
+  logEvent(state, `Underlays Ace of ${ace.suit.toUpperCase()} under Elite ${targetElite.rank} of ${targetElite.suit.toUpperCase()}`);
+  
+  // Prompt the user to select the underlaid suit power for this Elite card
+  // Resolve it instantly based on the selected ability index
+  resolveEliteAbility(state, active, targetElite, ace.suit, chosenAbilityIndex, extraParams, () => {});
+  
+  update10CardBuff(pState);
+  return state;
+}
+
+// Inner helper to execute Elite Card abilities
+function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extraParams, underlayCallback) {
+  const opp = player === 'A' ? 'B' : 'A';
+  const oppState = state.players[opp];
+  const pState = state.players[player];
+  const rank = targetElite.rank;
+  
+  if (suit === 'diamonds') {
+    if (rank === 'J') {
+      // Jack: [0] Attack twice, [1] Draw 2, [2] Attack once & Draw 1
+      if (abilityIdx === 0) {
+        targetElite.attackedThisTurn = -1; // can attack twice (starts at -1, can do two attacks to get to 1)
+        targetElite.hasHaste = true;
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} can attack TWICE and gains Strike.`);
+      } else if (abilityIdx === 1) {
+        drawCard(state, player);
+        drawCard(state, player);
+      } else {
+        targetElite.hasHaste = true;
+        drawCard(state, player);
+      }
+    } else if (rank === 'Q') {
+      // Queen: [0] Attack 3 times, [1] Attack 2 + Draw 1, [2] Attack 1 + Draw 2, [3] Draw 3
+      if (abilityIdx === 0) {
+        targetElite.attackedThisTurn = -2;
+        targetElite.hasHaste = true;
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} can attack THREE times and gains Strike.`);
+      } else if (abilityIdx === 1) {
+        targetElite.attackedThisTurn = -1;
+        targetElite.hasHaste = true;
+        drawCard(state, player);
+      } else if (abilityIdx === 2) {
+        targetElite.hasHaste = true;
+        drawCard(state, player);
+        drawCard(state, player);
+      } else {
+        drawCard(state, player);
+        drawCard(state, player);
+        drawCard(state, player);
+      }
+    } else if (rank === 'K') {
+      // King: [0] Attack 4, [1] Attack 3 + Draw 1, [2] Attack 2 + Draw 2, [3] Attack 1 + Draw 3, [4] Draw 4
+      if (abilityIdx === 0) {
+        targetElite.attackedThisTurn = -3;
+        targetElite.hasHaste = true;
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} can attack FOUR times and gains Strike.`);
+      } else if (abilityIdx === 1) {
+        targetElite.attackedThisTurn = -2;
+        targetElite.hasHaste = true;
+        drawCard(state, player);
+      } else if (abilityIdx === 2) {
+        targetElite.attackedThisTurn = -1;
+        targetElite.hasHaste = true;
+        drawCard(state, player);
+        drawCard(state, player);
+      } else if (abilityIdx === 3) {
+        targetElite.hasHaste = true;
+        drawCard(state, player);
+        drawCard(state, player);
+        drawCard(state, player);
+      } else {
+        drawCard(state, player);
+        drawCard(state, player);
+        drawCard(state, player);
+        drawCard(state, player);
+      }
+    } else if (rank === 'A') {
+      // Ace: [0] Underlay, [1] Both draw 5
+      if (abilityIdx === 0) {
+        underlayCallback(); // removes from board placing, marked as underlay
+      } else {
+        for (let i = 0; i < 5; i++) {
+          drawCard(state, 'A');
+          drawCard(state, 'B');
+        }
+        logEvent(state, "Ace of Diamonds triggers: Both players draw 5 cards!");
+      }
+    }
+  } else if (suit === 'hearts') {
+    if (rank === 'J' || rank === 'Q' || rank === 'K') {
+      // Mind control limit: J <= 11, Q <= 12, K <= 13
+      const limit = rank === 'J' ? 11 : rank === 'Q' ? 12 : 13;
+      // [0] Mind Control, [1] Heal 12/13/14 AND Damage 12/13/14
+      if (abilityIdx === 0) {
+        if (extraParams && extraParams.targetId) {
+          const ecIdx = oppState.board.findIndex(c => c.id === extraParams.targetId);
+          if (ecIdx !== -1) {
+            const enemyCard = oppState.board[ecIdx];
+            if (enemyCard.atk <= limit) {
+              oppState.board.splice(ecIdx, 1);
+              // Clean up stuns/tanks before joining new board
+              enemyCard.isTank = false;
+              enemyCard.stunnedTurns = 0;
+              pState.board.push(enemyCard);
+              logEvent(state, `MIND CONTROL! Steals enemy card ${enemyCard.suit.toUpperCase()} ${enemyCard.rank || enemyCard.value}`);
+            }
+          }
+        }
+      } else {
+        const val = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
+        logEvent(state, `Hearts healing/damage: heals friendly by ${val}, damages opponent LP by ${val}.`);
+        
+        // Heal player LP
+        healCharacter(state, player, 'player', val);
+        // Heal friendly board
+        pState.board.forEach(fc => {
+          healCharacter(state, player, fc, val);
+        });
+        
+        // Deal direct damage
+        oppState.lp = Math.max(0, oppState.lp - val);
+        if (oppState.lp <= 0) {
+          state.winner = player;
+          state.phase = 'GAME_OVER';
+          logEvent(state, `${oppState.name} has fallen! Game Over.`);
+        }
+      }
+    } else if (rank === 'A') {
+      // Ace: [0] Underlay, [1] Both restore 50 LP
+      if (abilityIdx === 0) {
+        underlayCallback();
+      } else {
+        healCharacter(state, 'A', 'player', 50);
+        healCharacter(state, 'B', 'player', 50);
+        logEvent(state, "Ace of Hearts triggers: Both players restore 50 LP!");
+      }
+    }
+  } else if (suit === 'spades') {
+    if (rank === 'J' || rank === 'Q' || rank === 'K') {
+      // [0] Tank & Stun for 1/2/3 turns, [1] Protective Shield
+      const turns = rank === 'J' ? 1 : rank === 'Q' ? 2 : 3;
+      if (abilityIdx === 0) {
+        targetElite.isTank = true;
+        oppState.board.forEach(ec => {
+          ec.stunnedTurns = turns;
+        });
+        logEvent(state, `Elite ${targetElite.rank} of SPADES becomes a Tank and STUNS all enemy board cards for ${turns} turns!`);
+      } else {
+        targetElite.shield = true;
+        logEvent(state, `Elite ${targetElite.rank} of SPADES gains a Protective Shield (broken only by damage > ${targetElite.value}).`);
+      }
+    } else if (rank === 'A') {
+      // Ace: [0] Underlay, [1] Stun entire board for 4 turns
+      if (abilityIdx === 0) {
+        underlayCallback();
+      } else {
+        pState.board.forEach(c => { c.stunnedTurns = 4; });
+        oppState.board.forEach(c => { c.stunnedTurns = 4; });
+        logEvent(state, "Ace of Spades triggers: Entire board (all cards) is STUNNED for 4 turns!");
+      }
+    }
+  } else if (suit === 'clubs') {
+    if (rank === 'J' || rank === 'Q' || rank === 'K') {
+      // [0] Deal 12/13/14 damage to all enemy board cards (no self-defeat)
+      // [1] Summon 2/3/4 defeated normal Clubs cards (< 12/13/14 value)
+      const dmg = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
+      const count = rank === 'J' ? 2 : rank === 'Q' ? 3 : 4;
+      if (abilityIdx === 0) {
+        logEvent(state, `Elite Clubs damage: Deals ${dmg} damage to all enemy board cards.`);
+        for (let i = oppState.board.length - 1; i >= 0; i--) {
+          const ec = oppState.board[i];
+          if (ec.shield) {
+            if (dmg > ec.value) {
+              ec.shield = false;
+              ec.hp -= dmg;
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield breaks! Takes ${dmg} damage.`);
+            } else {
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield absorbs Elite Clubs damage.`);
+            }
+          } else {
+            ec.hp -= dmg;
+            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} takes ${dmg} damage.`);
+          }
+          
+          if (ec.hp <= 0) {
+            oppState.board.splice(i, 1);
+            oppState.defeated.push(ec);
+            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Elite Clubs!`);
+          }
+        }
+      } else {
+        // Summon defeated Clubs
+        const eligible = pState.defeated
+          .filter(c => c.suit === 'clubs' && c.value < dmg)
+          .sort((a, b) => b.value - a.value);
+        
+        let summoned = 0;
+        for (let i = 0; i < count; i++) {
+          if (eligible.length > summoned) {
+            const resCard = eligible[summoned++];
+            const idx = pState.defeated.findIndex(c => c.id === resCard.id);
+            if (idx !== -1) {
+              pState.defeated.splice(idx, 1);
+              
+              // Elites summoning normal clubs keep base stats (strictly less than dmg condition, already normal)
+              resCard.atk = resCard.baseAtk;
+              resCard.hp = resCard.baseHp;
+              resCard.maxHp = resCard.baseHp;
+              resCard.shield = false;
+              resCard.isTank = false;
+              resCard.stunnedTurns = 0;
+              resCard.underlays = [];
+              
+              pState.board.push(resCard);
+              logEvent(state, `Summons defeated Clubs: ${resCard.suit.toUpperCase()} ${resCard.value} to board.`);
+            }
+          }
+        }
+      }
+    } else if (rank === 'A') {
+      // Ace: [0] Underlay, [1] Board Wipe
+      if (abilityIdx === 0) {
+        underlayCallback();
+      } else {
+        // Move all board cards to defeated piles
+        for (let i = pState.board.length - 1; i >= 0; i--) {
+          pState.defeated.push(pState.board[i]);
+        }
+        pState.board = [];
+        
+        for (let i = oppState.board.length - 1; i >= 0; i--) {
+          oppState.defeated.push(oppState.board[i]);
+        }
+        oppState.board = [];
+        
+        logEvent(state, "Ace of Clubs triggers: BOARD WIPE! All board cards sent to Defeated Piles.");
+      }
+    }
+  }
+}
+
+// Combat Execution
+export function executeCombat(state, attackerId, defenderId) {
+  const active = state.activePlayer;
+  const pState = state.players[active];
+  const opp = active === 'A' ? 'B' : 'A';
+  const oppState = state.players[opp];
+  
+  const attacker = pState.board.find(c => c.id === attackerId);
+  const defender = oppState.board.find(c => c.id === defenderId);
+  
+  if (!attacker || !defender) return state;
+  
+  if (attacker.stunnedTurns > 0) {
+    logEvent(state, `Stunned card cannot attack!`);
+    return state;
+  }
+  
+  // Can only attack if it has remaining attacks (default is 1 per turn, but diamonds elites can do more)
+  const maxAttacks = attacker.isElite && attacker.suit === 'diamonds' ? 
+    (attacker.rank === 'J' ? 2 : attacker.rank === 'Q' ? 3 : 4) : 1;
+    
+  if (attacker.attackedThisTurn >= maxAttacks) {
+    logEvent(state, `Attacker has already used all available attacks this turn!`);
+    return state;
+  }
+  
+  // Force Spades Tank attacking rule
+  const tanksOnOppBoard = oppState.board.filter(c => c.isTank);
+  if (tanksOnOppBoard.length > 0 && !defender.isTank) {
+    logEvent(state, `You must attack the enemy Spades Tank first!`);
+    return state;
+  }
+  
+  attacker.attackedThisTurn += 1;
+  logEvent(state, `${attacker.isElite ? 'Elite' : 'Normal'} ${attacker.suit.toUpperCase()} ${attacker.rank || attacker.value} attacks ${defender.isElite ? 'Elite' : 'Normal'} ${defender.suit.toUpperCase()} ${defender.rank || defender.value}`);
+  
+  // Combat math:
+  let attackerDmgDealt = attacker.atk;
+  let defenderDmgDealt = defender.atk;
+  
+  const defenderPrevHp = defender.hp;
+  
+  // 1. Resolve damage to defender (with shield check)
+  if (defender.shield) {
+    const shieldThreshold = defender.value;
+    if (attackerDmgDealt > shieldThreshold) {
+      defender.shield = false;
+      defender.hp -= attackerDmgDealt;
+      logEvent(state, `Defender shield breaks! Takes ${attackerDmgDealt} damage.`);
+    } else {
+      attackerDmgDealt = 0;
+      logEvent(state, `Defender shield absorbs all damage!`);
+    }
+  } else {
+    defender.hp -= attackerDmgDealt;
+  }
+  
+  // 2. Resolve damage to attacker (with shield check)
+  if (attacker.shield) {
+    const shieldThreshold = attacker.value;
+    if (defenderDmgDealt > shieldThreshold) {
+      attacker.shield = false;
+      attacker.hp -= defenderDmgDealt;
+      logEvent(state, `Attacker shield breaks! Takes ${defenderDmgDealt} damage.`);
+    } else {
+      defenderDmgDealt = 0;
+      logEvent(state, `Attacker shield absorbs all damage!`);
+    }
+  } else {
+    attacker.hp -= defenderDmgDealt;
+  }
+  
+  // 3. Excess damage to player LP:
+  // "If Card X's ATK is greater than Card Y's remaining HP, the remaining damage is applied directly to the defending player's LP."
+  if (attackerDmgDealt > defenderPrevHp) {
+    const excess = attackerDmgDealt - Math.max(0, defenderPrevHp);
+    oppState.lp = Math.max(0, oppState.lp - excess);
+    logEvent(state, `Excess damage: ${excess} damage dealt directly to defending player's LP! (Opponent LP: ${oppState.lp})`);
+    
+    if (oppState.lp <= 0) {
+      state.winner = active;
+      state.phase = 'GAME_OVER';
+      logEvent(state, `${oppState.name} has fallen! Game Over.`);
+      return state;
+    }
+  }
+  
+  // Check deaths
+  const attackerDefeated = attacker.hp <= 0;
+  const defenderDefeated = defender.hp <= 0;
+  
+  if (defenderDefeated) {
+    const idx = oppState.board.findIndex(c => c.id === defender.id);
+    if (idx !== -1) {
+      oppState.board.splice(idx, 1);
+    }
+    oppState.defeated.push(defender);
+    logEvent(state, `Defender ${defender.suit.toUpperCase()} ${defender.rank || defender.value} is defeated!`);
+  }
+  
+  if (attackerDefeated) {
+    const idx = pState.board.findIndex(c => c.id === attacker.id);
+    if (idx !== -1) {
+      pState.board.splice(idx, 1);
+    }
+    pState.defeated.push(attacker);
+    logEvent(state, `Attacker ${attacker.suit.toUpperCase()} ${attacker.rank || attacker.value} is defeated!`);
+    
+    // Set Resurrection candidate if attacker is defeated but defender survives
+    if (!defenderDefeated) {
+      // "Calculate the remaining HP of the surviving enemy card: HPremaining = HPmax - ATKfriendly"
+      const threshold = defender.maxHp - attacker.atk;
+      state.resurrectionCandidate = {
+        card: attacker,
+        threshold: threshold
+      };
+      logEvent(state, `Friendly card defeated in combat. Play healing power > ${threshold} to resurrect!`);
+    }
+  }
+  
+  return state;
+}
+
+// Attack Player Direct (if opponent has no board cards and no tanks)
+export function executeAttackPlayer(state, attackerId) {
+  const active = state.activePlayer;
+  const pState = state.players[active];
+  const opp = active === 'A' ? 'B' : 'A';
+  const oppState = state.players[opp];
+  
+  const attacker = pState.board.find(c => c.id === attackerId);
+  if (!attacker) return state;
+  
+  if (attacker.stunnedTurns > 0) {
+    logEvent(state, `Stunned card cannot attack!`);
+    return state;
+  }
+  
+  const maxAttacks = attacker.isElite && attacker.suit === 'diamonds' ? 
+    (attacker.rank === 'J' ? 2 : attacker.rank === 'Q' ? 3 : 4) : 1;
+    
+  if (attacker.attackedThisTurn >= maxAttacks) {
+    logEvent(state, `Attacker has already used all available attacks this turn!`);
+    return state;
+  }
+  
+  // Can only attack direct if opponent has no board cards
+  if (oppState.board.length > 0) {
+    logEvent(state, `Cannot attack opponent LP direct while they have cards on board!`);
+    return state;
+  }
+  
+  attacker.attackedThisTurn += 1;
+  oppState.lp = Math.max(0, oppState.lp - attacker.atk);
+  logEvent(state, `${attacker.isElite ? 'Elite' : 'Normal'} ${attacker.suit.toUpperCase()} ${attacker.rank || attacker.value} attacks opponent directly for ${attacker.atk} damage! (Opponent LP: ${oppState.lp})`);
+  
+  if (oppState.lp <= 0) {
+    state.winner = active;
+    state.phase = 'GAME_OVER';
+    logEvent(state, `${oppState.name} has fallen! Game Over.`);
+  }
+  
+  return state;
+}
