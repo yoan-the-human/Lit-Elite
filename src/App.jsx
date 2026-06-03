@@ -116,65 +116,65 @@ export default function App() {
   // Draft Phase Actions
   const handleSelectSubsection = (subId) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...draftNormalSubsection(next, subId) };
+      const next = structuredClone(prev);
+      return draftNormalSubsection(next, subId);
     });
   };
 
   const handleDraftElite = (cardId) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...draftEliteCard(next, cardId) };
+      const next = structuredClone(prev);
+      return draftEliteCard(next, cardId);
     });
   };
 
   const handleSelectFinalElites = (player, cardIds) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...selectFinalElites(next, player, cardIds) };
+      const next = structuredClone(prev);
+      return selectFinalElites(next, player, cardIds);
     });
   };
 
   // Gameplay actions
   const handlePlayNormal = (cardId, powerIdx, targetInfo) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...playNormalCard(next, cardId, powerIdx, targetInfo) };
+      const next = structuredClone(prev);
+      return playNormalCard(next, cardId, powerIdx, targetInfo);
     });
   };
 
   const handlePlayElite = (cardId, abilityIdx, extraParams) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...playEliteCard(next, cardId, abilityIdx, extraParams) };
+      const next = structuredClone(prev);
+      return playEliteCard(next, cardId, abilityIdx, extraParams);
     });
   };
 
   const handlePlayUnderlay = (aceId, targetEliteId, abilityIdx) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...playUnderlayAce(next, aceId, targetEliteId, abilityIdx) };
+      const next = structuredClone(prev);
+      return playUnderlayAce(next, aceId, targetEliteId, abilityIdx);
     });
   };
 
   const handleCombat = (attackerId, defenderId) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...executeCombat(next, attackerId, defenderId) };
+      const next = structuredClone(prev);
+      return executeCombat(next, attackerId, defenderId);
     });
   };
 
   const handleAttackPlayer = (attackerId) => {
     setGameState(prev => {
-      const next = { ...prev };
-      return { ...executeAttackPlayer(next, attackerId) };
+      const next = structuredClone(prev);
+      return executeAttackPlayer(next, attackerId);
     });
   };
 
   const handleEndTurn = () => {
     setGameState(prev => {
-      const next = { ...prev };
-      const updated = { ...endTurn(next) };
+      const next = structuredClone(prev);
+      const updated = endTurn(next);
       
       // Trigger hider block screen if hotseat mode
       if (updated.mode === 'hotseat' && updated.phase === 'GAMEPLAY' && !updated.winner) {
@@ -210,12 +210,12 @@ export default function App() {
     // AI gameplay turn
     if (gameState.phase === 'GAMEPLAY' && gameState.activePlayer === 'B' && gameState.mode === 'ai') {
       const timer = setTimeout(() => {
-        runAiGameplayTurn(gameState, (updatedState) => {
+        runAiGameplayTurn(structuredClone(gameState), (updatedState) => {
           // If the AI switched active player to 'A', check if handoff hider is needed
           if (updatedState.activePlayer === 'A' && updatedState.mode === 'hotseat') {
             setIsTurnHandoffActive(true);
           }
-          setGameState({ ...updatedState });
+          setGameState(updatedState);
         });
       }, 1200); // 1.2s delay for AI thinking feel
       return () => clearTimeout(timer);
