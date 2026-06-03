@@ -65,10 +65,8 @@ export default function DraftPhase({ gameState, onSelectSubsection }) {
         padding: '10px',
         borderRadius: '8px'
       }}>
-        {step === 1 && "Step 1: Player A chooses 1 subsection. Player B receives the paired subsection of that suit automatically."}
-        {step === 2 && "Step 2: Player B chooses 2 subsections. Player A receives the paired subsections automatically."}
-        {step === 3 && "Step 3: Player A chooses 2 subsections. Player B receives the paired subsections automatically."}
-        {step === 4 && "Step 4: Player B chooses remaining subsection. Player A receives the paired subsection automatically."}
+        {step === 1 && "Step 1: Player A chooses 1 Even subdeck (with the 10). Player B receives the paired Odd subdeck automatically."}
+        {step === 2 && "Step 2: Player B chooses 2 Even subdecks. Player A receives the paired Odd subdecks automatically."}
       </div>
 
       <div className="draft-container">
@@ -82,12 +80,12 @@ export default function DraftPhase({ gameState, onSelectSubsection }) {
 
         {/* Center: Pool */}
         <div className="glass-panel draft-pool">
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600' }}>Available Card Subsections</h3>
-          {availableSubsections.length === 0 ? (
+          <h3 style={{ fontSize: '1.25rem', fontWeight: '600' }}>Available Card Subsections (Even Only)</h3>
+          {availableSubsections.filter(s => s.type === 'even').length === 0 ? (
             <div style={{ color: 'var(--text-dim)' }}>All normal subsections drafted. Moving to Elite Cards!</div>
           ) : (
             <div className="subsection-grid">
-              {availableSubsections.map((sub) => {
+              {availableSubsections.filter(s => s.type === 'even').map((sub) => {
                 const label = SUIT_LABELS[sub.suit];
                 return (
                   <div 
@@ -104,7 +102,7 @@ export default function DraftPhase({ gameState, onSelectSubsection }) {
                       <span style={{ textTransform: 'capitalize', fontSize: '0.8rem', opacity: 0.8 }}>{sub.type}</span>
                     </div>
                     <div style={{ fontSize: '1.1rem', fontWeight: '700', margin: '8px 0' }}>
-                      {label.name} Sub-Deck
+                      {label.name} Even Subdeck
                     </div>
                     <div style={{ display: 'flex', gap: '4px', fontSize: '0.8rem', color: 'var(--text-dim)' }}>
                       Values: [{sub.cards.join(', ')}]

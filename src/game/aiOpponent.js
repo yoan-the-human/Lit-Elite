@@ -278,8 +278,17 @@ export function getAiNormalDraftChoice(state) {
 export function getAiEliteDraftChoice(state) {
   const available = state.draft.availableElites;
   const category = state.draft.currentEliteCategory;
-  const eligible = available.filter(c => c.rank === category);
   
+  if (category === null) {
+    // Dynamic category select state: AI is starting a new category draft round
+    // Prioritize choosing a Spade or Heart card to get good defensive/steal cards
+    const preferred = available.find(c => c.suit === 'spades') || 
+                      available.find(c => c.suit === 'hearts') || 
+                      available[0];
+    return preferred ? preferred.id : null;
+  }
+  
+  const eligible = available.filter(c => c.rank === category);
   if (eligible.length === 0) return null;
   
   // Prefer Spades (for tanks/shields) or Hearts (for mind control), or just random

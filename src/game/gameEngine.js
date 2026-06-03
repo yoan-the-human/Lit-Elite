@@ -17,7 +17,8 @@ export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
       // Elite draft
       availableElites: generateElites(),
       eliteDraftStep: 1, // Increments for turns in categories
-      currentEliteCategory: 'K', // 'K', 'Q', 'J', 'A'
+      currentEliteCategory: null, // Dynamic: starter chooses rank
+      eliteCategorySelector: startingPlayer, // swaps each round
       draftedElitesA: [], // All drafted elites for A (up to 8)
       draftedElitesB: [], // All drafted elites for B (up to 8)
       
@@ -136,7 +137,7 @@ export function drawCard(state, player) {
   update10CardBuff(pState);
 }
 
-// Normal Subsection Drafting
+// Normal Subsection Drafting - Even only, Odd paired, auto-completed at the end
 export function draftNormalSubsection(state, subsectionId) {
   if (state.phase !== 'DRAFT_NORMAL') return state;
   
@@ -144,12 +145,13 @@ export function draftNormalSubsection(state, subsectionId) {
   const currentDrafter = draftState.currentDrafter;
   const opponent = currentDrafter === 'A' ? 'B' : 'A';
   
+  // Validation: must end with _even
+  if (!subsectionId.endsWith('_even')) return state;
+  
   const subIdx = draftState.availableSubsections.findIndex(s => s.id === subsectionId);
   if (subIdx === -1) return state;
   
   const selectedSub = draftState.availableSubsections[subIdx];
-  
-  // Find paired subsection
   const pairedSubId = getPairedSubsectionId(subsectionId);
   const pairIdx = draftState.availableSubsections.findIndex(s => s.id === pairedSubId);
   const pairedSub = draftState.availableSubsections[pairIdx];
@@ -172,7 +174,7 @@ export function draftNormalSubsection(state, subsectionId) {
   draftState.availableSubsections.splice(firstIdx, 1);
   draftState.availableSubsections.splice(secondIdx, 1);
   
-  logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} drafted ${selectedSub.id} (${selectedCards.length} cards). Paired ${pairedSub.id} goes to other player.`);
+  logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} drafted Even subsection ${selectedSub.id.split('_')[0].toUpperCase()}. Paired Odd goes to other player.`);
   
   // Advancing steps
   if (draftState.step === 1) {
@@ -180,106 +182,113 @@ export function draftNormalSubsection(state, subsectionId) {
     draftState.currentDrafter = 'B';
   } else if (draftState.step === 2) {
     // Step 2 needs 2 selections by B
-    const bDraftedCount = currentDrafter === 'A' ? draftState.playerBNormals.length : draftState.playerBNormals.length; 
-    // Just count remaining subsections: 8 total. 1 pair chosen in step 1.
-    // If 4 subsections remaining, B has made 1 choice in step 2. We need 1 more choice from B.
-    if (draftState.availableSubsections.length === 4) {
-      draftState.currentDrafter = 'B';
+    const remainingEvens = draftState.availableSubsections.filter(s => s.type === 'even');
+    if (remainingEvens.length === 2) {
+      draftState.currentDrafter = 'B'; // Need 1 more choice from B
     } else {
-      // B has drafted both in step 2. Now A's turn in step 3.
-      draftState.step = 3;
+      // B finished drafting both. Now auto-assign last Even to Player A
+      const lastEven = remainingEvens[0];
+      const lastPairedId = getPairedSubsectionId(lastEven.id);
+      const lastPair = draftState.availableSubsections.find(s => s.id === lastPairedId);
+      
+      const lastEvenCards = lastEven.cards.map(v => createCard(lastEven.suit, v, false));
+      const lastOddCards = lastPair.cards.map(v => createCard(lastPair.suit, v, false));
+      
+      draftState.playerANormals.push(...lastEvenCards);
+      draftState.playerBNormals.push(...lastOddCards);
+      
+      logEvent(state, `Player A automatically receives remaining Even subsection ${lastEven.id.split('_')[0].toUpperCase()}. Paired Odd goes to Player B.`);
+      
+      // Clear pool
+      draftState.availableSubsections = [];
+      
+      // Transition to Elites!
+      state.phase = 'DRAFT_ELITE';
+      draftState.currentEliteCategory = null; // Any category can be selected first
+      draftState.eliteCategorySelector = 'A'; // A starts picking first normal and first elite
       draftState.currentDrafter = 'A';
+      draftState.eliteDraftStep = 1;
     }
-  } else if (draftState.step === 3) {
-    // Step 3 needs 2 selections by A
-    if (draftState.availableSubsections.length === 2) {
-      draftState.currentDrafter = 'A';
-    } else {
-      draftState.step = 4;
-      draftState.currentDrafter = 'B';
-    }
-  } else if (draftState.step === 4) {
-    // Done with normal drafting. Move to Elites!
-    state.phase = 'DRAFT_ELITE';
-    draftState.currentDrafter = 'A';
-    draftState.eliteDraftStep = 1;
-    draftState.currentEliteCategory = 'K';
   }
   
   return state;
 }
 
-// Elite Drafting
+// Elite Drafting with Dynamic Category Selector and swapping starters
 export function draftEliteCard(state, cardId) {
   if (state.phase !== 'DRAFT_ELITE') return state;
   
   const draftState = state.draft;
   const currentDrafter = draftState.currentDrafter;
-  const category = draftState.currentEliteCategory;
+  const opponent = currentDrafter === 'A' ? 'B' : 'A';
   
   const cardIdx = draftState.availableElites.findIndex(c => c.id === cardId);
   if (cardIdx === -1) return state;
   
   const card = draftState.availableElites[cardIdx];
-  if (card.rank !== category) return state; // Must draft matching rank category
   
-  // Assign card
-  if (currentDrafter === 'A') {
-    draftState.draftedElitesA.push(card);
-  } else {
-    draftState.draftedElitesB.push(card);
-  }
-  draftState.availableElites.splice(cardIdx, 1);
-  logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} drafted Elite ${card.rank} of ${card.suit.toUpperCase()}`);
-  
-  // Category transition logic (A-Bx2-A auto, etc.)
-  draftState.eliteDraftStep += 1;
-  const step = draftState.eliteDraftStep;
-  
-  if (category === 'K' || category === 'J') {
-    // Kings and Jacks: A -> B -> B -> (A remaining)
-    if (step === 2) {
-      draftState.currentDrafter = 'B';
-    } else if (step === 3) {
-      draftState.currentDrafter = 'B';
-    } else if (step === 4) {
-      // Remaining card goes to A automatically
-      const remainingIdx = draftState.availableElites.findIndex(c => c.rank === category);
-      if (remainingIdx !== -1) {
-        const remainingCard = draftState.availableElites[remainingIdx];
-        draftState.draftedElitesA.push(remainingCard);
-        draftState.availableElites.splice(remainingIdx, 1);
-        logEvent(state, `Player A automatically receives remaining Elite ${remainingCard.rank} of ${remainingCard.suit.toUpperCase()}`);
-      }
-      
-      // Advance category
-      draftState.eliteDraftStep = 1;
-      draftState.currentEliteCategory = category === 'K' ? 'Q' : 'A';
-      draftState.currentDrafter = category === 'K' ? 'B' : 'B';
+  if (draftState.currentEliteCategory === null) {
+    // Selection state: Active drafter (which is the current eliteCategorySelector) picks any rank
+    if (currentDrafter !== draftState.eliteCategorySelector) return state; // Only selector can choose rank
+    
+    const category = card.rank;
+    draftState.currentEliteCategory = category;
+    
+    // Assign card to selector
+    if (currentDrafter === 'A') {
+      draftState.draftedElitesA.push(card);
+    } else {
+      draftState.draftedElitesB.push(card);
     }
-  } else if (category === 'Q' || category === 'A') {
-    // Queens and Aces: B -> A -> A -> (B remaining)
-    if (step === 2) {
-      draftState.currentDrafter = 'A';
-    } else if (step === 3) {
-      draftState.currentDrafter = 'A';
-    } else if (step === 4) {
-      // Remaining card goes to B automatically
+    draftState.availableElites.splice(cardIdx, 1);
+    logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} chooses category ${category} and drafts Elite ${card.rank} of ${card.suit.toUpperCase()}`);
+    
+    // Opponent picks 2 cards of this category
+    draftState.eliteDraftStep = 2;
+    draftState.currentDrafter = opponent;
+  } else {
+    // Active category drafting state: card must match active category
+    if (card.rank !== draftState.currentEliteCategory) return state;
+    
+    // Assign card
+    if (currentDrafter === 'A') {
+      draftState.draftedElitesA.push(card);
+    } else {
+      draftState.draftedElitesB.push(card);
+    }
+    draftState.availableElites.splice(cardIdx, 1);
+    logEvent(state, `${currentDrafter === 'A' ? 'Player A' : 'Player B'} drafted Elite ${card.rank} of ${card.suit.toUpperCase()}`);
+    
+    // Advance step
+    if (draftState.eliteDraftStep === 2) {
+      draftState.eliteDraftStep = 3;
+      // currentDrafter stays the same (opponent drafts 2)
+    } else if (draftState.eliteDraftStep === 3) {
+      // Opponent drafted their 2nd card. Auto-assign remaining card to eliteCategorySelector.
+      const category = draftState.currentEliteCategory;
+      const selector = draftState.eliteCategorySelector;
+      
       const remainingIdx = draftState.availableElites.findIndex(c => c.rank === category);
       if (remainingIdx !== -1) {
         const remainingCard = draftState.availableElites[remainingIdx];
-        draftState.draftedElitesB.push(remainingCard);
+        if (selector === 'A') {
+          draftState.draftedElitesA.push(remainingCard);
+        } else {
+          draftState.draftedElitesB.push(remainingCard);
+        }
         draftState.availableElites.splice(remainingIdx, 1);
-        logEvent(state, `Player B automatically receives remaining Elite ${remainingCard.rank} of ${remainingCard.suit.toUpperCase()}`);
+        logEvent(state, `${selector === 'A' ? 'Player A' : 'Player B'} automatically receives remaining Elite ${remainingCard.rank} of ${remainingCard.suit.toUpperCase()}`);
       }
       
-      // Advance category
+      // Swap selector for next category round
+      const nextSelector = selector === 'A' ? 'B' : 'A';
+      draftState.eliteCategorySelector = nextSelector;
+      draftState.currentDrafter = nextSelector;
+      draftState.currentEliteCategory = null;
       draftState.eliteDraftStep = 1;
-      if (category === 'Q') {
-        draftState.currentEliteCategory = 'J';
-        draftState.currentDrafter = 'A';
-      } else {
-        // Elite drafting fully done! Players must select their final 4 elites.
+      
+      // Check if elite draft is complete
+      if (draftState.availableElites.length === 0) {
         state.phase = 'DRAFT_ELITE_SELECT';
         draftState.selectionTurn = 'A';
       }

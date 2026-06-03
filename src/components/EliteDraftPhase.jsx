@@ -8,6 +8,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
     availableElites, 
     currentDrafter, 
     currentEliteCategory, 
+    eliteCategorySelector,
     draftedElitesA, 
     draftedElitesB,
     selectionTurn
@@ -32,6 +33,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
   };
 
   const getRankCategoryLabel = (cat) => {
+    if (cat === null) return 'Any Category (Jack, Queen, King, Ace)';
     switch(cat) {
       case 'K': return 'Kings (Value 13)';
       case 'Q': return 'Queens (Value 12)';
@@ -42,16 +44,15 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
   };
 
   // Draft category rules helper text
-  const getCategoryRulesHelp = (cat) => {
-    switch(cat) {
-      case 'K':
-      case 'J':
-        return "Draft Order: Player A picks 1st -> Player B picks 2nd & 3rd -> Player A automatically receives the remaining card.";
-      case 'Q':
-      case 'A':
-        return "Draft Order: Player B picks 1st -> Player A picks 2nd & 3rd -> Player B automatically receives the remaining card.";
-      default: return "";
+  const getCategoryRulesHelp = (cat, selector) => {
+    const selectorName = selector === 'A' ? 'Player A' : (gameState.mode === 'ai' ? 'Computer (AI)' : 'Player B');
+    const opponentName = selector === 'A' ? (gameState.mode === 'ai' ? 'Computer (AI)' : 'Player B') : 'Player A';
+    
+    if (cat === null) {
+      return `Category Selection Round: ${selectorName} must select ANY available Elite card to start drafting that rank category.`;
     }
+    
+    return `Draft Order: ${selectorName} selected 1st -> ${opponentName} drafts 2 cards -> ${selectorName} automatically receives the remaining card.`;
   };
 
   // Validate selection for final 4 elites
@@ -187,7 +188,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
   }
 
   // standard draft phase (drafting 1 by 1)
-  const currentCategoryElites = availableElites.filter(c => c.rank === currentEliteCategory);
+  const isDrafterSelector = currentEliteCategory === null ? currentDrafter === eliteCategorySelector : true;
 
   return (
     <div className="draft-screen">
@@ -210,7 +211,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
         <div style={{ fontWeight: '700', color: 'var(--text-bright)', marginBottom: '4px' }}>
           Current Drafting Category: {getRankCategoryLabel(currentEliteCategory)}
         </div>
-        {getCategoryRulesHelp(currentEliteCategory)}
+        {getCategoryRulesHelp(currentEliteCategory, eliteCategorySelector)}
       </div>
 
       <div className="draft-container">
@@ -224,18 +225,32 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
 
         {/* Center: Pool */}
         <div className="glass-panel draft-pool">
-          <h3 style={{ fontSize: '1.25rem', fontWeight: '600' }}>Draft From Face-Up {currentEliteCategory}'s</h3>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: '600' }}>
+            {currentEliteCategory === null ? "Choose Category by Selecting Card" : `Draft From Face-Up ${currentEliteCategory}'s`}
+          </h3>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
-            {currentCategoryElites.map((card) => (
-              <Card 
-                key={card.id} 
-                card={card} 
-                onClick={() => {
-                  if (gameState.mode === 'ai' && currentDrafter === 'B') return;
-                  onDraftElite(card.id);
-                }} 
-              />
-            ))}
+            {availableElites.map((card) => {
+              const isCurrentCategory = currentEliteCategory === null || card.rank === currentEliteCategory;
+              const isClickable = isCurrentCategory && isDrafterSelector && !(gameState.mode === 'ai' && currentDrafter === 'B');
+              
+              return (
+                <div 
+                  key={card.id}
+                  style={{ 
+                    opacity: isCurrentCategory ? 1 : 0.2, 
+                    pointerEvents: isClickable ? 'auto' : 'none',
+                    transition: 'all 0.2s ease',
+                    transform: isClickable ? 'scale(1)' : 'scale(0.95)'
+                  }}
+                >
+                  <Card 
+                    card={card} 
+                    onClick={() => onDraftElite(card.id)}
+                    isPlayable={isClickable}
+                  />
+                </div>
+              );
+            })}
           </div>
         </div>
 

@@ -1,0 +1,5 @@
+When AI picks first something weird happens and he picks all the times and I always end up with 0 picks and 3 sets of even subdecks.
+
+When I play vs AI I want the game to ask if I want to go first
+
+when All normal subsections are drafted and it should move to elite cards - nothing happens, nothing loads
