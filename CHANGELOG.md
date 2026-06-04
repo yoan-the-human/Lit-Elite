@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+## [0.2.0](https://github.com/yoan-the-human/morld/compare/v0.1.3...v0.2.0) (2026-06-04)
+
+
+### 🚀 Новости
+
+* elites - diamonds - new power ([708d4ce](https://github.com/yoan-the-human/morld/commit/708d4cedf1fe8eebb971b7605f6769de060e9355))
+
 ### [0.1.3](https://github.com/yoan-the-human/morld/compare/v0.1.2...v0.1.3) (2026-06-04)
 
 
