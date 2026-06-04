@@ -15,7 +15,7 @@ export function runAiGameplayTurn(state, updateStateCallback) {
   const pA = currentState.players.A;
 
   // 1. Play Cards from Hand
-  const playLimit = getPlayLimit(pB.lp);
+  const playLimit = getPlayLimit(pB.lp, pB.has10CardBuff);
   if (pB.cardsPlayedThisTurn < playLimit && pB.hand.length > 0) {
     // Find a playable card
     // Prioritize Elites, then normal cards
@@ -172,7 +172,7 @@ function playAiNormal(state, card) {
     let target = null;
     if (card.suit === 'hearts') {
       target = pB.board.length > 0 ? pB.board[0].id : 'player';
-    } else if (card.suit === 'spades') {
+    } else if (card.suit === 'spades' || card.suit === 'clubs') {
       target = oppState.board.length > 0 ? oppState.board[0].id : null;
     }
     return playNormalCard(state, card.id, 0, target);
@@ -201,24 +201,24 @@ function playAiNormal(state, card) {
       powerIdx = 1; // direct damage
     }
   } else if (card.suit === 'spades') {
-    // Sweep if opponent board is crowded, else strike single target
-    if (oppState.board.length >= 2) {
-      powerIdx = 0; // Scythe Sweep (AoE)
-    } else if (oppState.board.length === 1) {
-      powerIdx = 1; // Shield Strike (Single target)
-      targetInfo = oppState.board[0].id;
+    // Stun if opponent has cards on board, else Tank
+    if (oppState.board.length > 0) {
+      powerIdx = 1; // Power 2 (Stun)
+      // Target the strongest opponent board card
+      const targetCard = [...oppState.board].sort((a, b) => b.atk - a.atk)[0];
+      targetInfo = targetCard.id;
     } else {
-      powerIdx = 1; // Stays on board (fallback to power 2 since no targets to sweep/strike)
+      powerIdx = 0; // Power 1 (Tank)
     }
   } else if (card.suit === 'clubs') {
-    // Resurrect if available, else detonate if enemy board has cards
-    const eligibleClubs = pB.defeated.filter(c => c.suit === 'clubs' && c.value < card.value);
-    if (eligibleClubs.length > 0) {
-      powerIdx = 1; // Resurrect Less
-    } else if (oppState.board.length > 0) {
-      powerIdx = 0; // Detonate
+    // Scythe Sweep if crowded, else Shield Strike
+    if (oppState.board.length >= 2) {
+      powerIdx = 0; // Power 1 (Scythe Sweep)
+    } else if (oppState.board.length === 1) {
+      powerIdx = 1; // Power 2 (Shield Strike)
+      targetInfo = oppState.board[0].id;
     } else {
-      powerIdx = 1; // Fallback
+      powerIdx = 1; // Power 2 (Shield Strike) fallback
     }
   }
 

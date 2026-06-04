@@ -1,7 +1,7 @@
 import React from 'react';
 import { SUIT_LABELS } from '../game/deckBuilder';
 
-export default function Card({ card, onClick, isPlayable = false, isTargetable = false, showBack = false }) {
+export default function Card({ card, onClick, isPlayable = false, isTargetable = false, isAttackReady = false, showBack = false }) {
   if (showBack) {
     return (
       <div 
@@ -68,6 +68,7 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
     suit,
     isPlayable ? 'playable' : '',
     isTargetable ? 'targetable' : '',
+    isAttackReady ? 'attack-ready' : '',
     stunnedTurns > 0 ? 'stunned' : '',
     shield ? 'has-shield' : ''
   ].filter(Boolean).join(' ');

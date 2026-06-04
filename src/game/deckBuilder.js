@@ -53,6 +53,7 @@ export function createCard(suit, value, isElite = false, rank = null) {
     stunnedTurns: 0,
     underlays: [], // Attached Ace cards
     attackedThisTurn: 0, // Number of times attacked this turn
+    maxAttacks: 1, // Maximum allowed attacks this turn
     hasHaste: false, // Diamonds Strike ability
     playedThisTurn: false
   };

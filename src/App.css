@@ -565,6 +565,23 @@
   to { border-color: rgba(239, 68, 68, 1); box-shadow: 0 0 15px rgba(239, 68, 68, 0.8); transform: scale(1.05); }
 }
 
+/* Attack Ready friendly board card glow */
+.card-element.attack-ready {
+  cursor: pointer;
+  animation: pulse-attack-ready 1.5s infinite;
+}
+
+@keyframes pulse-attack-ready {
+  0%, 100% {
+    border-color: #22c55e;
+    box-shadow: 0 0 8px rgba(34, 197, 94, 0.3);
+  }
+  50% {
+    border-color: #4ade80;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.7);
+  }
+}
+
 /* Card internals */
 .card-suit-symbol {
   font-size: 1.25rem;

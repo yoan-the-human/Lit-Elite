@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import { SUIT_LABELS } from '../game/deckBuilder';
-import { getPlayLimit } from '../game/gameEngine';
+import { getPlayLimit, canCardAttack } from '../game/gameEngine';
 
 export default function GameBoard({ 
   gameState, 
@@ -51,12 +51,12 @@ export default function GameBoard({
         { title: 'Power 2 (Damage)', desc: 'Deal direct damage equal to card value to opponent LP.' }
       ];
       case 'spades': return [
-        { title: 'Power 1 (Scythe Sweep)', desc: 'Deal damage equal to card value to all enemy board cards. Card is defeated.' },
-        { title: 'Power 2 (Shield Strike)', desc: 'Deal damage equal to card value to one enemy board card. Card stays on board.' }
+        { title: 'Power 1 (Tank)', desc: 'Place card in front lane to protect other friendly board cards.' },
+        { title: 'Power 2 (Stun)', desc: 'Stun one enemy board card for 1 turn.' }
       ];
       case 'clubs': return [
-        { title: 'Power 1 (Detonate)', desc: 'Deals damage equal to card value to all enemy board cards. Self-destructs.' },
-        { title: 'Power 2 (Resurrect Less)', desc: 'Resurrect strongest defeated Clubs card with strictly less ATK.' }
+        { title: 'Power 1 (Scythe Sweep)', desc: 'Deal damage equal to card value to all enemy board cards. Card is defeated.' },
+        { title: 'Power 2 (Shield Strike)', desc: 'Deal damage equal to card value to one enemy board card. Card stays on board.' }
       ];
       default: return [];
     }
@@ -126,9 +126,9 @@ export default function GameBoard({
   };
 
   const limitForRank = (rank) => {
-    if (rank === 'J') return 11;
-    if (rank === 'Q') return 12;
-    if (rank === 'K') return 13;
+    if (rank === 'J') return 12;
+    if (rank === 'Q') return 13;
+    if (rank === 'K') return 14;
     return 14;
   };
 
@@ -153,8 +153,8 @@ export default function GameBoard({
           // Heal needs target
           setTargetingMode('HEAL');
           setSelectedPowerIdx(0); // arbitrary but registers as play
-        } else if (suit === 'spades') {
-          // Stun needs target
+        } else if ((suit === 'spades' || suit === 'clubs') && oppPState.board.length > 0) {
+          // Stun / Shield Strike needs target
           setTargetingMode('STUN');
           setSelectedPowerIdx(0);
         } else {
@@ -177,8 +177,8 @@ export default function GameBoard({
     if (suit === 'hearts' && powerIdx === 0) {
       // Heal needs target
       setTargetingMode('HEAL');
-    } else if (suit === 'spades' && powerIdx === 1) {
-      // Stun needs target
+    } else if ((suit === 'spades' || suit === 'clubs') && powerIdx === 1 && oppPState.board.length > 0) {
+      // Stun / Shield Strike needs target
       setTargetingMode('STUN');
     } else {
       // Plays immediately
@@ -246,6 +246,10 @@ export default function GameBoard({
 
     // Case 4: Underlay Ace targeting
     if (isUnderlayTargeting && playerOwner === activePlayer && card.isElite) {
+      if (pendingUnderlayAce && pendingUnderlayAce.suit === card.suit) {
+        // Block same suit underlay
+        return;
+      }
       setSelectedEliteForUnderlay(card);
       setIsUnderlayTargeting(false);
       setIsUnderlayPowerModalOpen(true);
@@ -254,11 +258,7 @@ export default function GameBoard({
 
     // Case 5: Attacker selection for combat
     if (!targetingMode && playerOwner === activePlayer) {
-      // Check if card can attack
-      const maxAttacks = card.isElite && card.suit === 'diamonds' ? 
-        (card.rank === 'J' ? 2 : card.rank === 'Q' ? 3 : 4) : 1;
-      
-      if (card.stunnedTurns === 0 && card.attackedThisTurn < maxAttacks) {
+      if (canCardAttack(card)) {
         setAttackerCard(card);
         setTargetingMode('ATTACK');
       }
@@ -334,7 +334,11 @@ export default function GameBoard({
         const limit = limitForRank(selectedHandCard.rank);
         if (card.atk <= limit) isTargetable = true;
       }
-      if (isUnderlayTargeting && !isOpponentOfActive && card.isElite) isTargetable = true;
+      if (isUnderlayTargeting && !isOpponentOfActive && card.isElite) {
+        if (pendingUnderlayAce && pendingUnderlayAce.suit !== card.suit) {
+          isTargetable = true;
+        }
+      }
       if (targetingMode === 'ATTACK' && isOpponentOfActive) {
         const tanks = oppPState.board.filter(c => c.isTank);
         if (tanks.length > 0) {
@@ -344,12 +348,15 @@ export default function GameBoard({
         }
       }
 
+      const isAttackReady = activePlayer === playerOwner && !isAiTurn && !winner && !targetingMode && !isUnderlayTargeting && canCardAttack(card);
+
       return (
         <Card 
           key={card.id} 
           card={card} 
           onClick={() => handleBoardCardClick(card, playerOwner)}
           isTargetable={isTargetable}
+          isAttackReady={isAttackReady}
         />
       );
     };
@@ -384,7 +391,7 @@ export default function GameBoard({
         <div className="targeting-indicator-banner">
           <span>
             {targetingMode === 'HEAL' && "Select a friendly card or click your LP bar to Heal!"}
-            {targetingMode === 'STUN' && (selectedHandCard?.suit === 'spades' ? "Select an enemy card to Shield Strike!" : "Select an enemy card to Stun!")}
+            {targetingMode === 'STUN' && (selectedHandCard?.suit === 'clubs' ? "Select an enemy card to Shield Strike!" : "Select an enemy card to Stun!")}
             {targetingMode === 'MIND_CONTROL' && "Select an enemy card with low enough ATK to Mind Control!"}
             {targetingMode === 'ATTACK' && "Select an enemy card or click enemy LP (if no board cards) to Attack!"}
           </span>
@@ -446,7 +453,7 @@ export default function GameBoard({
               borderRadius: '4px',
               border: '1px solid rgba(255,255,255,0.1)'
             }}>
-              Plays: {pB.cardsPlayedThisTurn}/{getPlayLimit(pB.lp)}
+              Plays: {pB.cardsPlayedThisTurn}/{getPlayLimit(pB.lp, pB.has10CardBuff)}
             </div>
             <div 
               className="lp-counter"
@@ -459,7 +466,7 @@ export default function GameBoard({
                 border: (activePlayer === 'B' && targetingMode === 'HEAL') ? '2px solid var(--color-clubs)' : (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0 ? '2px solid var(--color-hearts)' : 'none')
               }}
             >
-              LP: {pB.lp}
+              ❤️{pB.lp}/150 LP
             </div>
           </div>
         </div>
@@ -468,7 +475,7 @@ export default function GameBoard({
         <div className="hand-container" style={{ transform: 'rotate(0)' }}>
           {pB.hand.map((card, i) => {
             const showBack = gameState.mode === 'ai' ? true : (activePlayer !== 'B');
-            const isPlayable = activePlayer === 'B' && gameState.mode !== 'ai' && !winner;
+            const isPlayable = activePlayer === 'B' && gameState.mode !== 'ai' && !winner && pB.cardsPlayedThisTurn < getPlayLimit(pB.lp, pB.has10CardBuff);
             return (
               <Card 
                 key={card.id || i} 
@@ -508,7 +515,7 @@ export default function GameBoard({
         <div className="hand-container">
           {pA.hand.map((card, i) => {
             const showBack = gameState.mode === 'ai' ? false : (activePlayer !== 'A');
-            const isPlayable = activePlayer === 'A' && !winner;
+            const isPlayable = activePlayer === 'A' && !winner && pA.cardsPlayedThisTurn < getPlayLimit(pA.lp, pA.has10CardBuff);
             return (
               <Card 
                 key={card.id || i} 
@@ -541,7 +548,7 @@ export default function GameBoard({
               borderRadius: '4px',
               border: '1px solid rgba(255,255,255,0.1)'
             }}>
-              Plays: {pA.cardsPlayedThisTurn}/{getPlayLimit(pA.lp)}
+              Plays: {pA.cardsPlayedThisTurn}/{getPlayLimit(pA.lp, pA.has10CardBuff)}
             </div>
             <div 
               className="lp-counter"
