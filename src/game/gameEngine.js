@@ -119,7 +119,7 @@ export function drawCard(state, player) {
       card.hasHaste = false;
       
       pState.hand.push(card);
-      logEvent(state, `${pState.name} draws ${card.isElite ? 'Elite' : 'Normal'} ${card.suit.toUpperCase()} ${card.rank || card.value} from DEFEATED pile, taking ${fatigueDamage} fatigue damage!`);
+      logEvent(state, `${pState.name} draws ${card.rank || card.value} of ${card.suit.toUpperCase()} from DEFEATED pile, taking ${fatigueDamage} fatigue damage!`);
       update10CardBuff(pState);
       
       if (pState.lp <= 0) {
@@ -450,7 +450,7 @@ export function endTurn(state) {
     if (c.stunnedTurns > 0) {
       c.stunnedTurns -= 1;
       if (c.stunnedTurns === 0) {
-        logEvent(state, `${c.isElite ? 'Elite' : 'Normal'} ${c.suit.toUpperCase()} ${c.rank || c.value} recovered from stun.`);
+        logEvent(state, `${c.rank || c.value} of ${c.suit.toUpperCase()} recovered from stun.`);
       }
     }
   });
@@ -549,7 +549,7 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
   pState.hand.splice(cardIdx, 1);
   pState.cardsPlayedThisTurn += 1;
   
-  logEvent(state, `Plays Normal Card: ${card.suit.toUpperCase()} ${card.value}${isDual ? ' [DUAL ACTIVATION]' : ''}`);
+  logEvent(state, `Plays ${card.value} of ${card.suit.toUpperCase()}${isDual ? ' [DUAL ACTIVATION]' : ''}`);
   
   // Store powers to execute
   const powersToRun = [];
@@ -609,8 +609,12 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
           const ecIdx = oppState.board.findIndex(c => c.id === targetInfo);
           if (ecIdx !== -1) {
             const ec = oppState.board[ecIdx];
+            if (ec.isElite) {
+              logEvent(state, `Cannot stun Elite card ${ec.rank} of ${ec.suit.toUpperCase()} with a Normal Spades card!`);
+              return state;
+            }
             ec.stunnedTurns = 1;
-            logEvent(state, `${card.suit.toUpperCase()} ${card.value} stuns enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} for 1 turn!`);
+            logEvent(state, `${card.value} of ${card.suit.toUpperCase()} stuns enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()} for 1 turn!`);
           }
         }
       }
@@ -626,17 +630,16 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
         for (let i = oppState.board.length - 1; i >= 0; i--) {
           const ec = oppState.board[i];
           if (ec.shield) {
-            const shieldThreshold = ec.value;
-            if (card.value > shieldThreshold) {
+            const shieldThreshold = ec.hp;
+            if (card.value >= shieldThreshold) {
               ec.shield = false;
-              ec.hp -= card.value;
-              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield breaks! Takes ${card.value} damage.`);
+              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble POPPED by Scythe Sweep.`);
             } else {
-              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield absorbs Scythe Sweep damage.`);
+              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble absorbs Scythe Sweep damage and does not pop.`);
             }
           } else {
             ec.hp -= card.value;
-            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} takes ${card.value} damage.`);
+            logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()} takes ${card.value} damage.`);
           }
           
           if (ec.hp <= 0) {
@@ -655,17 +658,16 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
           if (ecIdx !== -1) {
             const ec = oppState.board[ecIdx];
             if (ec.shield) {
-              const shieldThreshold = ec.value;
-              if (card.value > shieldThreshold) {
+              const shieldThreshold = ec.hp;
+              if (card.value >= shieldThreshold) {
                 ec.shield = false;
-                ec.hp -= card.value;
-                logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield breaks! Takes ${card.value} damage.`);
+                logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble POPPED by Shield Strike.`);
               } else {
-                logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield absorbs damage.`);
+                logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble absorbs Shield Strike damage and does not pop.`);
               }
             } else {
               ec.hp -= card.value;
-              logEvent(state, `Shield Strike! Deals ${card.value} Clubs damage to enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value}.`);
+              logEvent(state, `Shield Strike! Deals ${card.value} Clubs damage to enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}.`);
             }
             
             if (ec.hp <= 0) {
@@ -707,7 +709,7 @@ export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = n
   pState.hand.splice(cardIdx, 1);
   pState.cardsPlayedThisTurn += 1;
   
-  logEvent(state, `Plays Elite Card: ${card.rank} of ${card.suit.toUpperCase()}`);
+  logEvent(state, `Plays ${card.rank} of ${card.suit.toUpperCase()}`);
   
   let shouldPlaceOnBoard = true;
   
@@ -785,85 +787,54 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
   
   if (suit === 'diamonds') {
     if (rank === 'J') {
-      // Jack: [0] Attack twice, [1] Draw 2, [2] Attack once & Draw 1
+      // Jack: [0] Haste & Draw 1, [1] Shield
       if (abilityIdx === 0) {
-        targetElite.maxAttacks = 2;
-        targetElite.attackedThisTurn = 0;
-        targetElite.hasHaste = true;
-        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} can attack TWICE and gains Strike.`);
-      } else if (abilityIdx === 1) {
-        drawCard(state, player);
-        drawCard(state, player);
-      } else {
         targetElite.maxAttacks = 1;
         targetElite.attackedThisTurn = 0;
         targetElite.hasHaste = true;
         drawCard(state, player);
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 1 card and can attack immediately.`);
+      } else {
+        targetElite.shield = true;
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
       }
     } else if (rank === 'Q') {
-      // Queen: [0] Attack 3 times, [1] Attack 2 + Draw 1, [2] Attack 1 + Draw 2, [3] Draw 3
+      // Queen: [0] Haste & Draw 2, [1] Shield
       if (abilityIdx === 0) {
-        targetElite.maxAttacks = 3;
-        targetElite.attackedThisTurn = 0;
-        targetElite.hasHaste = true;
-        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} can attack THREE times and gains Strike.`);
-      } else if (abilityIdx === 1) {
         targetElite.maxAttacks = 2;
         targetElite.attackedThisTurn = 0;
         targetElite.hasHaste = true;
         drawCard(state, player);
-      } else if (abilityIdx === 2) {
-        targetElite.maxAttacks = 1;
-        targetElite.attackedThisTurn = 0;
-        targetElite.hasHaste = true;
         drawCard(state, player);
-        drawCard(state, player);
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 2 cards and can attack twice immediately.`);
       } else {
-        drawCard(state, player);
-        drawCard(state, player);
-        drawCard(state, player);
+        targetElite.shield = true;
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
       }
     } else if (rank === 'K') {
-      // King: [0] Attack 4, [1] Attack 3 + Draw 1, [2] Attack 2 + Draw 2, [3] Attack 1 + Draw 3, [4] Draw 4
+      // King: [0] Haste & Draw 3, [1] Shield
       if (abilityIdx === 0) {
-        targetElite.maxAttacks = 4;
-        targetElite.attackedThisTurn = 0;
-        targetElite.hasHaste = true;
-        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} can attack FOUR times and gains Strike.`);
-      } else if (abilityIdx === 1) {
         targetElite.maxAttacks = 3;
         targetElite.attackedThisTurn = 0;
         targetElite.hasHaste = true;
         drawCard(state, player);
-      } else if (abilityIdx === 2) {
-        targetElite.maxAttacks = 2;
-        targetElite.attackedThisTurn = 0;
-        targetElite.hasHaste = true;
         drawCard(state, player);
         drawCard(state, player);
-      } else if (abilityIdx === 3) {
-        targetElite.maxAttacks = 1;
-        targetElite.attackedThisTurn = 0;
-        targetElite.hasHaste = true;
-        drawCard(state, player);
-        drawCard(state, player);
-        drawCard(state, player);
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 3 cards and can attack 3 times immediately.`);
       } else {
-        drawCard(state, player);
-        drawCard(state, player);
-        drawCard(state, player);
-        drawCard(state, player);
+        targetElite.shield = true;
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
       }
     } else if (rank === 'A') {
-      // Ace: [0] Underlay, [1] Both draw 5
+      // Ace: [0] Underlay, [1] Both draw 4
       if (abilityIdx === 0) {
         underlayCallback(); // removes from board placing, marked as underlay
       } else {
-        for (let i = 0; i < 5; i++) {
+        for (let i = 0; i < 4; i++) {
           drawCard(state, 'A');
           drawCard(state, 'B');
         }
-        logEvent(state, "Ace of Diamonds triggers: Both players draw 5 cards!");
+        logEvent(state, "Ace of Diamonds triggers: Both players draw 4 cards!");
       }
     }
   } else if (suit === 'hearts') {
@@ -950,16 +921,16 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
         for (let i = oppState.board.length - 1; i >= 0; i--) {
           const ec = oppState.board[i];
           if (ec.shield) {
-            if (dmg > ec.value) {
+            const shieldThreshold = ec.hp;
+            if (dmg >= shieldThreshold) {
               ec.shield = false;
-              ec.hp -= dmg;
-              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield breaks! Takes ${dmg} damage.`);
+              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble POPPED by Elite Clubs damage.`);
             } else {
-              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield absorbs Elite Clubs damage.`);
+              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble absorbs Elite Clubs damage and does not pop.`);
             }
           } else {
             ec.hp -= dmg;
-            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} takes ${dmg} damage.`);
+            logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()} takes ${dmg} damage.`);
           }
           
           if (ec.hp <= 0) {
@@ -1044,7 +1015,7 @@ export function executeCombat(state, attackerId, defenderId) {
   }
   
   attacker.attackedThisTurn += 1;
-  logEvent(state, `${attacker.isElite ? 'Elite' : 'Normal'} ${attacker.suit.toUpperCase()} ${attacker.rank || attacker.value} attacks ${defender.isElite ? 'Elite' : 'Normal'} ${defender.suit.toUpperCase()} ${defender.rank || defender.value}`);
+  logEvent(state, `${attacker.rank || attacker.value} of ${attacker.suit.toUpperCase()} attacks ${defender.rank || defender.value} of ${defender.suit.toUpperCase()}`);
   
   // Combat math:
   let attackerDmgDealt = attacker.atk;
@@ -1053,47 +1024,63 @@ export function executeCombat(state, attackerId, defenderId) {
   const defenderPrevHp = defender.hp;
   
   // 1. Resolve damage to defender (with shield check)
+  let actualDmgToDefender = 0;
   if (defender.shield) {
-    const shieldThreshold = defender.value;
-    if (attackerDmgDealt > shieldThreshold) {
+    const threshold = defender.hp;
+    if (attackerDmgDealt >= threshold) {
       defender.shield = false;
-      defender.hp -= attackerDmgDealt;
-      logEvent(state, `Defender shield breaks! Takes ${attackerDmgDealt} damage.`);
+      logEvent(state, `Defender shield pops! Absorbed all ${attackerDmgDealt} damage.`);
     } else {
-      attackerDmgDealt = 0;
-      logEvent(state, `Defender shield absorbs all damage!`);
+      logEvent(state, `Defender shield absorbs all ${attackerDmgDealt} damage and does not pop.`);
     }
+    attackerDmgDealt = 0;
   } else {
     defender.hp -= attackerDmgDealt;
+    actualDmgToDefender = attackerDmgDealt;
   }
   
   // 2. Resolve damage to attacker (with shield check)
+  let actualDmgToAttacker = 0;
   if (attacker.shield) {
-    const shieldThreshold = attacker.value;
-    if (defenderDmgDealt > shieldThreshold) {
+    const threshold = attacker.hp;
+    if (defenderDmgDealt >= threshold) {
       attacker.shield = false;
-      attacker.hp -= defenderDmgDealt;
-      logEvent(state, `Attacker shield breaks! Takes ${defenderDmgDealt} damage.`);
+      logEvent(state, `Attacker shield pops! Absorbed all ${defenderDmgDealt} damage.`);
     } else {
-      defenderDmgDealt = 0;
-      logEvent(state, `Attacker shield absorbs all damage!`);
+      logEvent(state, `Attacker shield absorbs all ${defenderDmgDealt} damage and does not pop.`);
     }
+    defenderDmgDealt = 0;
   } else {
     attacker.hp -= defenderDmgDealt;
+    actualDmgToAttacker = defenderDmgDealt;
   }
   
   // 3. Excess damage to player LP:
-  // "If Card X's ATK is greater than Card Y's remaining HP, the remaining damage is applied directly to the defending player's LP."
-  if (attackerDmgDealt > defenderPrevHp) {
-    const excess = attackerDmgDealt - Math.max(0, defenderPrevHp);
-    oppState.lp = Math.max(0, oppState.lp - excess);
-    logEvent(state, `Excess damage: ${excess} damage dealt directly to defending player's LP! (Opponent LP: ${oppState.lp})`);
-    
-    if (oppState.lp <= 0) {
-      state.winner = active;
-      state.phase = 'GAME_OVER';
-      logEvent(state, `${oppState.name} has fallen! Game Over.`);
-      return state;
+  if (attacker.atk >= defender.atk) {
+    if (actualDmgToDefender > defenderPrevHp) {
+      const excess = actualDmgToDefender - Math.max(0, defenderPrevHp);
+      oppState.lp = Math.max(0, oppState.lp - excess);
+      logEvent(state, `Excess damage: ${excess} damage dealt directly to defending player's LP! (Opponent LP: ${oppState.lp})`);
+      
+      if (oppState.lp <= 0) {
+        state.winner = active;
+        state.phase = 'GAME_OVER';
+        logEvent(state, `${oppState.name} has fallen! Game Over.`);
+        return state;
+      }
+    }
+  } else {
+    if (actualDmgToAttacker > attackerPrevHp) {
+      const excess = actualDmgToAttacker - Math.max(0, attackerPrevHp);
+      pState.lp = Math.max(0, pState.lp - excess);
+      logEvent(state, `Excess damage: ${excess} damage dealt directly to active player's LP! (Player LP: ${pState.lp})`);
+      
+      if (pState.lp <= 0) {
+        state.winner = opp;
+        state.phase = 'GAME_OVER';
+        logEvent(state, `${pState.name} has fallen! Game Over.`);
+        return state;
+      }
     }
   }
   
@@ -1145,7 +1132,7 @@ export function executeAttackPlayer(state, attackerId) {
   
   attacker.attackedThisTurn += 1;
   oppState.lp = Math.max(0, oppState.lp - attacker.atk);
-  logEvent(state, `${attacker.isElite ? 'Elite' : 'Normal'} ${attacker.suit.toUpperCase()} ${attacker.rank || attacker.value} attacks opponent directly for ${attacker.atk} damage! (Opponent LP: ${oppState.lp})`);
+  logEvent(state, `${attacker.rank || attacker.value} of ${attacker.suit.toUpperCase()} attacks opponent directly for ${attacker.atk} damage! (Opponent LP: ${oppState.lp})`);
   
   if (oppState.lp <= 0) {
     state.winner = active;

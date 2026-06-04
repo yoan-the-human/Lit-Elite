@@ -91,21 +91,24 @@ export function buildDeck(normalCards, eliteCards) {
   const shuffledNormals = shuffle(normalCards);
   const shuffledElites = shuffle(eliteCards); // 8 elites
 
-  const Nnorm = shuffledNormals.length;
   const deck = [];
   
-  // The top of the deck has the first (Nnorm - 8) normal cards
-  const topNormalsCount = Nnorm - 8;
-  for (let i = 0; i < topNormalsCount; i++) {
+  // Top of the deck: 6 normal cards for the initial hand
+  for (let i = 0; i < 6; i++) {
     deck.push(shuffledNormals[i]);
   }
   
-  // The bottom of the deck alternates Normal, Elite (8 times)
-  let normalIdx = topNormalsCount;
+  // The remaining deck: E,N,E,N,N... from last to first
+  // Which is N, N, E, N, E repeated 4 times from top to bottom
+  let normalIdx = 6;
   let eliteIdx = 0;
-  for (let i = 0; i < 8; i++) {
-    deck.push(shuffledNormals[normalIdx++]);
-    deck.push(shuffledElites[eliteIdx++]);
+  
+  for (let i = 0; i < 4; i++) {
+    deck.push(shuffledNormals[normalIdx++]); // N
+    deck.push(shuffledNormals[normalIdx++]); // N
+    deck.push(shuffledElites[eliteIdx++]);   // E
+    deck.push(shuffledNormals[normalIdx++]); // N
+    deck.push(shuffledElites[eliteIdx++]);   // E
   }
   
   return deck;

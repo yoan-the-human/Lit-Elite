@@ -68,26 +68,20 @@ export default function GameBoard({
   const getEliteAbilities = (suit, rank) => {
     if (suit === 'diamonds') {
       if (rank === 'J') return [
-        'Attack twice and gain Strike',
-        'Draw 2 cards',
-        'Attack once and draw 1 card'
+        'Haste & Draw: Attack immediately and draw 1 card',
+        'Shield: Gain protective bubble'
       ];
       if (rank === 'Q') return [
-        'Attack 3 times and gain Strike',
-        'Attack twice and draw 1 card',
-        'Attack once and draw 2 cards',
-        'Draw 3 cards'
+        'Haste & Draw: Attack twice immediately and draw 2 cards',
+        'Shield: Gain protective bubble'
       ];
       if (rank === 'K') return [
-        'Attack 4 times and gain Strike',
-        'Attack 3 times and draw 1 card',
-        'Attack twice and draw 2 cards',
-        'Attack once and draw 3 cards',
-        'Draw 4 cards'
+        'Haste & Draw: Attack 3 times immediately and draw 3 cards',
+        'Shield: Gain protective bubble'
       ];
       if (rank === 'A') return [
         'Underlay: Attach under a board Elite to grant it Diamonds powers',
-        'Symmetrical Draw: Both players draw 5 cards'
+        'Symmetrical Draw: Both players draw 4 cards'
       ];
     }
     if (suit === 'hearts') {
@@ -337,7 +331,13 @@ export default function GameBoard({
     const renderCardInstance = (card) => {
       const isOpponentOfActive = playerOwner !== activePlayer;
       let isTargetable = false;
-      if (targetingMode === 'STUN' && isOpponentOfActive) isTargetable = true;
+      if (targetingMode === 'STUN' && isOpponentOfActive) {
+        if (selectedHandCard && !selectedHandCard.isElite) {
+          isTargetable = !card.isElite; // Normal cards can only stun normal cards!
+        } else {
+          isTargetable = true;
+        }
+      }
       if (targetingMode === 'HEAL' && !isOpponentOfActive) isTargetable = true;
       if (targetingMode === 'MIND_CONTROL' && isOpponentOfActive) {
         const limit = limitForRank(selectedHandCard.rank);
@@ -395,6 +395,10 @@ export default function GameBoard({
       </div>
     );
   };
+
+  const cannotPlayAny = activePState.hand.length === 0 || activePState.cardsPlayedThisTurn >= getPlayLimit(activePState.lp, activePState.has10CardBuff);
+  const noReadyAttackers = !activePState.board.some(c => canCardAttack(c));
+  const isEndTurnPulsing = !winner && !isAiTurn && cannotPlayAny && noReadyAttackers && !targetingMode && !isUnderlayTargeting;
 
   return (
     <div className="gameplay-arena">
@@ -511,7 +515,7 @@ export default function GameBoard({
               Turn {turnCount}
             </div>
             <button 
-              className="btn-premium"
+              className={`btn-premium ${isEndTurnPulsing ? 'btn-pulsate' : ''}`}
               disabled={isAiTurn || !!winner}
               onClick={onEndTurn}
             >
