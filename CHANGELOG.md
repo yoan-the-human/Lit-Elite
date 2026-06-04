@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [0.1.2](https://github.com/yoan-the-human/morld/compare/v0.1.1...v0.1.2) (2026-06-04)
+
+
+### 🐛 Бъгове
+
+* fixed bugs ([9692d2f](https://github.com/yoan-the-human/morld/commit/9692d2f92967fb577b9ad05fd76893a526e38df8))
+
 ### [0.1.1](https://github.com/yoan-the-human/morld/compare/v0.1.0...v0.1.1) (2026-06-04)
 
 
