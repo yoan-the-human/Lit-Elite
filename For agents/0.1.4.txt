@@ -1,0 +1,5 @@
+the enemy had a 6 of hearts and I wanted to attack his LP didrectly, but it didnt gave me until I defeated the 6 of hearts, but that is a bug, because the 6 is not a tank.
+
+the elite cards have an additional k/q/j /a symbol at the top right - remove it like on the rest of the cards you can put the attack on all cards on the top right corner because its too packed at the bottom
+
+when some player have tank then the screen gets stretched out a bit more and I can barely see how much LP the enemy has

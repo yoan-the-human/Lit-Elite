@@ -15,6 +15,7 @@ export default function GameBoard({
   const { players, activePlayer, turnCount, winner } = gameState;
   const pA = players.A;
   const pB = players.B;
+  const hasTankA = pA.board.some(c => c.isTank);
   const hasTankB = pB.board.some(c => c.isTank);
 
   // Local UI state for targeting and choices
@@ -371,21 +372,24 @@ export default function GameBoard({
 
     // Return lanes in order: for opponent (Player B/top), tanks are at the bottom (facing center).
     // For friendly player (Player A/bottom), tanks are at the top (facing center).
+    const showNormal = normalLane.length > 0 || tankLane.length === 0;
+    const showTank = tankLane.length > 0;
+
     return (
       <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '8px' }}>
         {isTopPlayer ? (
           <>
             {/* Back Row */}
-            <div className="board-lane">{normalLane.map(renderCardInstance)}</div>
+            {showNormal && <div className="board-lane">{normalLane.map(renderCardInstance)}</div>}
             {/* Front Row (Tanks) */}
-            <div className="board-lane tanks">{tankLane.map(renderCardInstance)}</div>
+            {showTank && <div className="board-lane tanks">{tankLane.map(renderCardInstance)}</div>}
           </>
         ) : (
           <>
             {/* Front Row (Tanks) */}
-            <div className="board-lane tanks">{tankLane.map(renderCardInstance)}</div>
+            {showTank && <div className="board-lane tanks">{tankLane.map(renderCardInstance)}</div>}
             {/* Back Row */}
-            <div className="board-lane">{normalLane.map(renderCardInstance)}</div>
+            {showNormal && <div className="board-lane">{normalLane.map(renderCardInstance)}</div>}
           </>
         )}
       </div>
@@ -560,16 +564,16 @@ export default function GameBoard({
             </div>
             <div 
               className="lp-counter"
-              onClick={activePlayer === 'A' && targetingMode === 'HEAL' ? handleLpHealClick : (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0 ? handleOpponentLpAttackClick : undefined)}
+              onClick={activePlayer === 'A' && targetingMode === 'HEAL' ? handleLpHealClick : (activePlayer === 'B' && targetingMode === 'ATTACK' && !hasTankA ? handleOpponentLpAttackClick : undefined)}
               style={{
-                cursor: (activePlayer === 'A' && targetingMode === 'HEAL') || (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0) ? 'pointer' : 'default',
-                animation: (activePlayer === 'A' && targetingMode === 'HEAL') || (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0) ? 'pulse-alert 1s infinite alternate' : 'none',
+                cursor: (activePlayer === 'A' && targetingMode === 'HEAL') || (activePlayer === 'B' && targetingMode === 'ATTACK' && !hasTankA) ? 'pointer' : 'default',
+                animation: (activePlayer === 'A' && targetingMode === 'HEAL') || (activePlayer === 'B' && targetingMode === 'ATTACK' && !hasTankA) ? 'pulse-alert 1s infinite alternate' : 'none',
                 padding: '2px 8px',
                 borderRadius: '6px',
-                border: (activePlayer === 'A' && targetingMode === 'HEAL') ? '2px solid var(--color-clubs)' : (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0 ? '2px solid var(--color-hearts)' : 'none')
+                border: (activePlayer === 'A' && targetingMode === 'HEAL') ? '2px solid var(--color-clubs)' : (activePlayer === 'B' && targetingMode === 'ATTACK' && !hasTankA ? '2px solid var(--color-hearts)' : 'none')
               }}
             >
-              LP: {pA.lp}
+              ❤️{pA.lp} LP
             </div>
           </div>
         </div>

@@ -75,10 +75,14 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
 
   return (
     <div className={classNames} onClick={onClick}>
-      {/* Top row: suit and elite indicator */}
+      {/* Top row: suit and attack stat */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <span className={`card-suit-symbol ${suit}`}>{labelInfo.symbol}</span>
-        {isElite && <span className="card-badge-elite">{rank}</span>}
+        {rank !== 'A' && (
+          <span className="card-stat-atk" title="Attack Power" style={{ fontSize: '0.85rem', fontWeight: '800' }}>
+            ⚔️{atk}
+          </span>
+        )}
       </div>
 
       {/* Center value */}
@@ -167,10 +171,7 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
 
       {/* Bottom row stats */}
       {rank !== 'A' && (
-        <div className="card-stats-row">
-          <span className="card-stat-atk" title="Attack Power">
-            ⚔️{atk}
-          </span>
+        <div className="card-stats-row" style={{ justifyContent: 'center' }}>
           <span className="card-stat-hp" title="Health Points">
             ❤️{hp}/{maxHp}
           </span>

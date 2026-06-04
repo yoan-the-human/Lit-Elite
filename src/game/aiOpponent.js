@@ -229,10 +229,6 @@ function playAiNormal(state, card) {
 function chooseAiAttackTarget(state, attacker) {
   const oppState = state.players.A;
 
-  if (oppState.board.length === 0) {
-    return 'player'; // Attack directly
-  }
-
   // Force Spades Tank attacking rule
   const tanks = oppState.board.filter(c => c.isTank);
   if (tanks.length > 0) {
@@ -240,20 +236,8 @@ function chooseAiAttackTarget(state, attacker) {
     return tanks.sort((a, b) => a.hp - b.hp)[0];
   }
 
-  // Otherwise, choose best target:
-  // Can we defeat an enemy card?
-  const defeatable = oppState.board.filter(c => c.hp <= attacker.atk);
-  if (defeatable.length > 0) {
-    // Yes! Attack the strongest defeatable card to deal excess damage to player LP!
-    return defeatable.sort((a, b) => b.atk - a.atk)[0];
-  }
-
-  // Else, just attack the strongest enemy card that has lower attack than our attacker,
-  // or attack player directly? Wait, you cannot attack player directly if they have board cards!
-  // "Can only attack direct if opponent has no board cards."
-  // So we must attack a board card. Let's attack the one that will deal minimal retaliation,
-  // or a high threat card. Let's pick the one with lowest ATK.
-  return oppState.board.sort((a, b) => a.atk - b.atk)[0];
+  // If there are no Spades Tanks, AI can attack the player directly (very strong play).
+  return 'player';
 }
 
 // AI draft helper: selects a subsection
