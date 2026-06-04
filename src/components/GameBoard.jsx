@@ -15,6 +15,7 @@ export default function GameBoard({
   const { players, activePlayer, turnCount, winner } = gameState;
   const pA = players.A;
   const pB = players.B;
+  const hasTankB = pB.board.some(c => c.isTank);
 
   // Local UI state for targeting and choices
   const [selectedHandCard, setSelectedHandCard] = useState(null); // Card selected from hand
@@ -153,8 +154,8 @@ export default function GameBoard({
           // Heal needs target
           setTargetingMode('HEAL');
           setSelectedPowerIdx(0); // arbitrary but registers as play
-        } else if ((suit === 'spades' || suit === 'clubs') && oppPState.board.length > 0) {
-          // Stun / Shield Strike needs target
+        } else if (suit === 'spades' && oppPState.board.length > 0) {
+          // Stun needs target
           setTargetingMode('STUN');
           setSelectedPowerIdx(0);
         } else {
@@ -259,8 +260,14 @@ export default function GameBoard({
     // Case 5: Attacker selection for combat
     if (!targetingMode && playerOwner === activePlayer) {
       if (canCardAttack(card)) {
-        setAttackerCard(card);
-        setTargetingMode('ATTACK');
+        if (oppPState.board.length === 0) {
+          // Attack player directly automatically!
+          onAttackPlayer(card.id);
+          resetStates();
+        } else {
+          setAttackerCard(card);
+          setTargetingMode('ATTACK');
+        }
       }
       return;
     }
@@ -294,7 +301,8 @@ export default function GameBoard({
   };
 
   const handleOpponentLpAttackClick = () => {
-    if (targetingMode === 'ATTACK' && oppPState.board.length === 0) {
+    const hasTank = oppPState.board.some(c => c.isTank);
+    if (targetingMode === 'ATTACK' && !hasTank) {
       onAttackPlayer(attackerCard.id);
       resetStates();
     }
@@ -393,7 +401,7 @@ export default function GameBoard({
             {targetingMode === 'HEAL' && "Select a friendly card or click your LP bar to Heal!"}
             {targetingMode === 'STUN' && (selectedHandCard?.suit === 'clubs' ? "Select an enemy card to Shield Strike!" : "Select an enemy card to Stun!")}
             {targetingMode === 'MIND_CONTROL' && "Select an enemy card with low enough ATK to Mind Control!"}
-            {targetingMode === 'ATTACK' && "Select an enemy card or click enemy LP (if no board cards) to Attack!"}
+            {targetingMode === 'ATTACK' && "Select an enemy card or click enemy LP (if no enemy Spades Tanks) to Attack!"}
           </span>
           <button 
             onClick={handleCancelAction}
@@ -457,16 +465,16 @@ export default function GameBoard({
             </div>
             <div 
               className="lp-counter"
-              onClick={activePlayer === 'B' && targetingMode === 'HEAL' ? handleLpHealClick : (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0 ? handleOpponentLpAttackClick : undefined)}
+              onClick={activePlayer === 'B' && targetingMode === 'HEAL' ? handleLpHealClick : (activePlayer === 'A' && targetingMode === 'ATTACK' && !hasTankB ? handleOpponentLpAttackClick : undefined)}
               style={{
-                cursor: (activePlayer === 'B' && targetingMode === 'HEAL') || (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0) ? 'pointer' : 'default',
-                animation: (activePlayer === 'B' && targetingMode === 'HEAL') || (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0) ? 'pulse-alert 1s infinite alternate' : 'none',
+                cursor: (activePlayer === 'B' && targetingMode === 'HEAL') || (activePlayer === 'A' && targetingMode === 'ATTACK' && !hasTankB) ? 'pointer' : 'default',
+                animation: (activePlayer === 'B' && targetingMode === 'HEAL') || (activePlayer === 'A' && targetingMode === 'ATTACK' && !hasTankB) ? 'pulse-alert 1s infinite alternate' : 'none',
                 padding: '2px 8px',
                 borderRadius: '6px',
-                border: (activePlayer === 'B' && targetingMode === 'HEAL') ? '2px solid var(--color-clubs)' : (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0 ? '2px solid var(--color-hearts)' : 'none')
+                border: (activePlayer === 'B' && targetingMode === 'HEAL') ? '2px solid var(--color-clubs)' : (activePlayer === 'A' && targetingMode === 'ATTACK' && !hasTankB ? '2px solid var(--color-hearts)' : 'none')
               }}
             >
-              ❤️{pB.lp}/150 LP
+              ❤️{pB.lp} LP
             </div>
           </div>
         </div>

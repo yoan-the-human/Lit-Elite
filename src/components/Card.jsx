@@ -99,6 +99,28 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
         </div>
       )}
 
+      {/* Attack Ready Indicator */}
+      {isAttackReady && (
+        <div style={{
+          position: 'absolute',
+          top: '6px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(34,197,94,0.95)',
+          border: '1px solid #fff',
+          borderRadius: '4px',
+          color: '#fff',
+          fontSize: '0.55rem',
+          fontWeight: '800',
+          padding: '1px 4px',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 0 6px rgba(34, 197, 94, 0.6)',
+          zIndex: 5
+        }}>
+          ⚔️ READY
+        </div>
+      )}
+
       {/* Tank Indicator */}
       {isTank && (
         <div style={{

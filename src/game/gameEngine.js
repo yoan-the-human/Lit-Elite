@@ -92,10 +92,6 @@ export function update10CardBuff(playerState) {
     if (!playerState.has10CardBuff) {
       playerState.has10CardBuff = true;
     }
-  } else if (playerState.hand.length <= 6) {
-    if (playerState.has10CardBuff) {
-      playerState.has10CardBuff = false;
-    }
   }
 }
 
@@ -426,17 +422,10 @@ export function startTurn(state) {
   pState.cardsPlayedThisTurn = 0;
   pState.underlaysPlayedThisTurn = 0;
   
-  // Stun tick: reduce stunned turns for friendly board cards
   pState.board.forEach(card => {
     card.attackedThisTurn = 0; // reset attack counters
     card.maxAttacks = 1; // reset allowed attacks to default
     card.playedThisTurn = false; // clear summoning sickness
-    if (card.stunnedTurns > 0) {
-      card.stunnedTurns -= 1;
-      if (card.stunnedTurns === 0) {
-        logEvent(state, `${card.isElite ? 'Elite' : 'Normal'} ${card.suit.toUpperCase()} ${card.rank || card.value} recovered from stun.`);
-      }
-    }
   });
   
   // Draw card step
@@ -454,10 +443,16 @@ export function endTurn(state) {
   const active = state.activePlayer;
   const pState = state.players[active];
   
-  // End of turn cleanup: Restore all surviving board cards back to their base HP (decaying temporary buffs)
+  // End of turn cleanup: Restore all surviving board cards back to their base HP (decaying temporary buffs) and decrement stun
   pState.board.forEach(c => {
     c.maxHp = c.baseHp;
     c.hp = c.baseHp;
+    if (c.stunnedTurns > 0) {
+      c.stunnedTurns -= 1;
+      if (c.stunnedTurns === 0) {
+        logEvent(state, `${c.isElite ? 'Elite' : 'Normal'} ${c.suit.toUpperCase()} ${c.rank || c.value} recovered from stun.`);
+      }
+    }
   });
   
   // Opponent board cleanup
@@ -466,6 +461,14 @@ export function endTurn(state) {
     c.maxHp = c.baseHp;
     c.hp = c.baseHp;
   });
+  
+  // Check if hand size is <= 6 at the end of the turn to deactivate 10-card hand buff
+  if (pState.hand.length <= 6) {
+    if (pState.has10CardBuff) {
+      pState.has10CardBuff = false;
+      logEvent(state, `${pState.name} hand is <= 6. 10-Card Hand Buff deactivated.`);
+    }
+  }
   
   logEvent(state, `${pState.name} ends turn. Surviving board cards fully restored to base HP.`);
   
@@ -491,31 +494,6 @@ export function endTurn(state) {
 
 // Healing helper with overheal logic
 export function healCharacter(state, player, target, healAmount) {
-  // If resurrection candidate is valid, heal card trigger resurrection
-  if (state.resurrectionCandidate) {
-    const candidate = state.resurrectionCandidate;
-    if (healAmount > candidate.threshold) {
-      const defPile = state.players[player].defeated;
-      const cardIdx = defPile.findIndex(c => c.id === candidate.card.id);
-      if (cardIdx !== -1) {
-        const card = defPile[cardIdx];
-        defPile.splice(cardIdx, 1);
-        
-        // Restore stats
-        card.hp = card.maxHp;
-        card.atk = card.baseAtk;
-        card.isTank = false;
-        card.shield = false;
-        card.stunnedTurns = 0;
-        card.underlays = [];
-        card.playedThisTurn = true; // summoning sickness
-        
-        state.players[player].board.push(card);
-        logEvent(state, `RESURRECTION! Friendly ${card.suit.toUpperCase()} ${card.rank || card.value} immediately resurrected to board!`);
-        state.resurrectionCandidate = null;
-      }
-    }
-  }
 
   if (target === 'player') {
     const pState = state.players[player];
@@ -1139,17 +1117,6 @@ export function executeCombat(state, attackerId, defenderId) {
     }
     pState.defeated.push(attacker);
     logEvent(state, `Attacker ${attacker.suit.toUpperCase()} ${attacker.rank || attacker.value} is defeated!`);
-    
-    // Set Resurrection candidate if attacker is defeated but defender survives
-    if (!defenderDefeated) {
-      // "Calculate the remaining HP of the surviving enemy card: HPremaining = HPmax - ATKfriendly"
-      const threshold = defender.maxHp - attacker.atk;
-      state.resurrectionCandidate = {
-        card: attacker,
-        threshold: threshold
-      };
-      logEvent(state, `Friendly card defeated in combat. Play healing power > ${threshold} to resurrect!`);
-    }
   }
   
   return state;
@@ -1170,9 +1137,9 @@ export function executeAttackPlayer(state, attackerId) {
     return state;
   }
   
-  // Can only attack direct if opponent has no board cards
-  if (oppState.board.length > 0) {
-    logEvent(state, `Cannot attack opponent LP direct while they have cards on board!`);
+  // Can only attack direct if opponent has no Spades Tanks on board
+  if (oppState.board.some(c => c.isTank)) {
+    logEvent(state, `Cannot attack opponent LP direct while they have Spades Tanks on board!`);
     return state;
   }
   

@@ -98,6 +98,43 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
     );
   };
 
+  const renderNormalDraftedList = (normals) => {
+    if (normals.length === 0) return <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>No normal cards drafted yet.</div>;
+    const grouped = normals.reduce((acc, card) => {
+      acc[card.suit] = acc[card.suit] || [];
+      acc[card.suit].push(card.value);
+      return acc;
+    }, {});
+
+    return Object.entries(grouped).map(([suit, values]) => {
+      const label = SUIT_LABELS[suit];
+      return (
+        <div key={suit} style={{ marginBottom: '8px', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: label.color }}>
+            <span>{label.symbol}</span>
+            <span>{label.name}</span>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
+            {values.sort((a,b) => a-b).map((v, i) => (
+              <span 
+                key={i} 
+                style={{ 
+                  background: 'rgba(255,255,255,0.05)', 
+                  border: '1px solid rgba(255,255,255,0.1)', 
+                  borderRadius: '4px', 
+                  padding: '1px 6px', 
+                  fontSize: '0.75rem' 
+                }}
+              >
+                {v}
+              </span>
+            ))}
+          </div>
+        </div>
+      );
+    });
+  };
+
   if (phase === 'DRAFT_ELITE_SELECT') {
     // Selection phase (Select 4 out of 8)
     const pool = selectionTurn === 'A' ? draftedElitesA : draftedElitesB;
@@ -127,60 +164,72 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
 
         <div style={{ 
           display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center', 
-          gap: '30px',
-          margin: '20px 0' 
+          gap: '30px', 
+          justifyContent: 'center', 
+          width: '100%', 
+          maxWidth: '1200px', 
+          margin: '20px auto' 
         }}>
-          <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
-            {pool.map((card) => {
-              const isSelected = selectedIds.includes(card.id);
-              const label = SUIT_LABELS[card.suit];
-              return (
-                <div 
-                  key={card.id} 
-                  style={{ position: 'relative', cursor: 'pointer' }}
-                  onClick={() => {
-                    // Block click for AI selection
-                    if (gameState.mode === 'ai' && selectionTurn === 'B') return;
-                    handleToggleSelect(card.id, card.rank, pool);
-                  }}
-                >
-                  <Card card={card} />
-                  {/* Select Checkbox overlay */}
-                  <div style={{
-                    position: 'absolute',
-                    top: '-6px',
-                    right: '-6px',
-                    width: '24px',
-                    height: '24px',
-                    borderRadius: '50%',
-                    background: isSelected ? 'var(--color-clubs)' : 'rgba(0,0,0,0.7)',
-                    border: '2px solid #fff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: '0.8rem',
-                    fontWeight: '800',
-                    color: '#fff',
-                    boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
-                  }}>
-                    {isSelected ? '✓' : ''}
+          {/* Main selection area */}
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '30px' }}>
+            <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+              {pool.map((card) => {
+                const isSelected = selectedIds.includes(card.id);
+                const label = SUIT_LABELS[card.suit];
+                return (
+                  <div 
+                    key={card.id} 
+                    style={{ position: 'relative', cursor: 'pointer' }}
+                    onClick={() => {
+                      // Block click for AI selection
+                      if (gameState.mode === 'ai' && selectionTurn === 'B') return;
+                      handleToggleSelect(card.id, card.rank, pool);
+                    }}
+                  >
+                    <Card card={card} />
+                    {/* Select Checkbox overlay */}
+                    <div style={{
+                      position: 'absolute',
+                      top: '-6px',
+                      right: '-6px',
+                      width: '24px',
+                      height: '24px',
+                      borderRadius: '50%',
+                      background: isSelected ? 'var(--color-clubs)' : 'rgba(0,0,0,0.7)',
+                      border: '2px solid #fff',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '0.8rem',
+                      fontWeight: '800',
+                      color: '#fff',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.5)'
+                    }}>
+                      {isSelected ? '✓' : ''}
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
+
+            <div>
+              <button 
+                className="btn-premium btn-clubs"
+                disabled={!isSelectionValid || (gameState.mode === 'ai' && selectionTurn === 'B')}
+                onClick={handleConfirmSelection}
+                style={{ fontSize: '1.1rem', padding: '12px 32px' }}
+              >
+                Confirm Selected Elites
+              </button>
+            </div>
           </div>
 
-          <div>
-            <button 
-              className="btn-premium btn-clubs"
-              disabled={!isSelectionValid || (gameState.mode === 'ai' && selectionTurn === 'B')}
-              onClick={handleConfirmSelection}
-              style={{ fontSize: '1.1rem', padding: '12px 32px' }}
-            >
-              Confirm Selected Elites
-            </button>
+          {/* Sidebar showing normal cards for reference */}
+          <div className="glass-panel" style={{ width: '260px', padding: '16px', alignSelf: 'flex-start', maxHeight: '70vh', overflowY: 'auto' }}>
+            <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', fontSize: '1rem', textAlign: 'center', color: 'var(--text-bright)' }}>Your Normals</h3>
+            <div style={{ marginTop: '12px' }}>
+              {renderNormalDraftedList(selectionTurn === 'A' ? draft.playerANormals : draft.playerBNormals)}
+            </div>
           </div>
         </div>
       </div>
@@ -216,10 +265,13 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
 
       <div className="draft-container">
         {/* Left Sidebar: Player A */}
-        <div className="glass-panel draft-sidebar">
-          <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>Player A Elites</h3>
+        <div className="glass-panel draft-sidebar" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
+          <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>Player A Stash</h3>
           <div style={{ marginTop: '12px' }}>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginBottom: '8px' }}>Elites</h4>
             {renderEliteDraftedList(draftedElitesA)}
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginTop: '16px', marginBottom: '8px' }}>Normals</h4>
+            {renderNormalDraftedList(draft.playerANormals)}
           </div>
         </div>
 
@@ -255,12 +307,15 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
         </div>
 
         {/* Right Sidebar: Player B */}
-        <div className="glass-panel draft-sidebar">
+        <div className="glass-panel draft-sidebar" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
           <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
-            {gameState.mode === 'ai' ? 'Computer Elites' : 'Player B Elites'}
+            {gameState.mode === 'ai' ? 'Computer Stash' : 'Player B Stash'}
           </h3>
           <div style={{ marginTop: '12px' }}>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginBottom: '8px' }}>Elites</h4>
             {renderEliteDraftedList(draftedElitesB)}
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginTop: '16px', marginBottom: '8px' }}>Normals</h4>
+            {renderNormalDraftedList(draft.playerBNormals)}
           </div>
         </div>
       </div>
