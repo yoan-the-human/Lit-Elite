@@ -60,7 +60,7 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
     );
   }
 
-  const { suit, value, rank, isElite, atk, hp, maxHp, shield, stunnedTurns, underlays } = card;
+  const { suit, value, rank, isElite, atk, hp, maxHp, shield, stunnedTurns, underlays, isTank } = card;
   const labelInfo = SUIT_LABELS[suit];
 
   const classNames = [
@@ -98,15 +98,61 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
         </div>
       )}
 
+      {/* Tank Indicator */}
+      {isTank && (
+        <div style={{
+          position: 'absolute',
+          top: '32px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(0,0,0,0.85)',
+          border: '1px solid #f59e0b',
+          borderRadius: '4px',
+          color: '#f59e0b',
+          fontSize: '0.55rem',
+          fontWeight: '800',
+          padding: '1px 4px',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 0 6px rgba(245, 158, 11, 0.4)',
+          zIndex: 5
+        }}>
+          🛡️ TANK
+        </div>
+      )}
+
+      {/* Stun Indicator */}
+      {stunnedTurns > 0 && (
+        <div style={{
+          position: 'absolute',
+          bottom: rank === 'A' ? '12px' : '32px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(239, 68, 68, 0.95)',
+          border: '1px solid #fff',
+          borderRadius: '4px',
+          color: '#fff',
+          fontSize: '0.55rem',
+          fontWeight: '800',
+          padding: '1px 4px',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 0 6px rgba(239, 68, 68, 0.6)',
+          zIndex: 5
+        }}>
+          ⚡ STUN: {stunnedTurns}
+        </div>
+      )}
+
       {/* Bottom row stats */}
-      <div className="card-stats-row">
-        <span className="card-stat-atk" title="Attack Power">
-          ⚔️{atk}
-        </span>
-        <span className="card-stat-hp" title="Health Points">
-          ❤️{hp}/{maxHp}
-        </span>
-      </div>
+      {rank !== 'A' && (
+        <div className="card-stats-row">
+          <span className="card-stat-atk" title="Attack Power">
+            ⚔️{atk}
+          </span>
+          <span className="card-stat-hp" title="Health Points">
+            ❤️{hp}/{maxHp}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

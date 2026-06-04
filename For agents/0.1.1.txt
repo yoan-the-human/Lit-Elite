@@ -1,0 +1,1 @@
+when I try to immediately attack with a card that I have just played I get [Turn 1 - P1]: Attacker is not able to attack! (Stunned, Summoning Sickness, or Max Attacks reached). which is not needed - just the player should not be able to attack with cards that can't attack. Make the board cards have indication when they can attack.

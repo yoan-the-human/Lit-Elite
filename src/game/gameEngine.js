@@ -1,5 +1,20 @@
 import { SUBSECTIONS, createCard, buildDeck, getPairedSubsectionId, generateElites } from './deckBuilder.js';
 
+export function getPlayLimit(lp) {
+  if (lp <= 50) return 3;
+  if (lp <= 100) return 2;
+  return 1;
+}
+
+export function canCardAttack(card) {
+  if (card.stunnedTurns > 0) return false;
+  if (card.playedThisTurn && !card.hasHaste) return false;
+  
+  const maxAttacks = card.isElite && card.suit === 'diamonds' ? 
+    (card.rank === 'J' ? 2 : card.rank === 'Q' ? 3 : 4) : 1;
+  return card.attackedThisTurn < maxAttacks;
+}
+
 export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
   return {
     mode, // 'hotseat' or 'ai'
@@ -298,8 +313,7 @@ export function draftEliteCard(state, cardId) {
       
       // Check if elite draft is complete
       if (draftState.availableElites.length === 0) {
-        state.phase = 'DRAFT_ELITE_SELECT';
-        draftState.selectionTurn = 'A';
+        initializeGameDecks(state);
       }
     }
   }
@@ -364,8 +378,8 @@ function initializeGameDecks(state) {
   const pA = state.players.A;
   const pB = state.players.B;
   
-  pA.deck = buildDeck(state.draft.playerANormals, state.draft.finalElitesA);
-  pB.deck = buildDeck(state.draft.playerBNormals, state.draft.finalElitesB);
+  pA.deck = buildDeck(state.draft.playerANormals, state.draft.draftedElitesA);
+  pB.deck = buildDeck(state.draft.playerBNormals, state.draft.draftedElitesB);
   
   logEvent(state, "Decks built using spacing constraint. Shuffling normal and elite pools.");
   
@@ -415,6 +429,7 @@ export function startTurn(state) {
   // Stun tick: reduce stunned turns for friendly board cards
   pState.board.forEach(card => {
     card.attackedThisTurn = 0; // reset attack counters
+    card.playedThisTurn = false; // clear summoning sickness
     if (card.stunnedTurns > 0) {
       card.stunnedTurns -= 1;
       if (card.stunnedTurns === 0) {
@@ -495,6 +510,7 @@ export function healCharacter(state, player, target, healAmount) {
         card.shield = false;
         card.stunnedTurns = 0;
         card.underlays = [];
+        card.playedThisTurn = true; // summoning sickness
         
         state.players[player].board.push(card);
         logEvent(state, `RESURRECTION! Friendly ${card.suit.toUpperCase()} ${card.rank || card.value} immediately resurrected to board!`);
@@ -539,8 +555,9 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
   const opp = active === 'A' ? 'B' : 'A';
   const oppState = state.players[opp];
   
-  if (pState.has10CardBuff && pState.cardsPlayedThisTurn >= 3) {
-    logEvent(state, `Cannot play card. Exceeded play limit (3 cards) of 10-Card Hand Buff!`);
+  const playLimit = getPlayLimit(pState.lp);
+  if (pState.cardsPlayedThisTurn >= playLimit) {
+    logEvent(state, `Cannot play card. Exceeded play limit of ${playLimit} cards based on health!`);
     return state;
   }
   
@@ -562,7 +579,7 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
   if (isDual) {
     powersToRun.push(1, 2);
   } else {
-    powersToRun.push(powerIndex);
+    powersToRun.push(powerIndex + 1);
   }
   
   // Flag to check if card survives play (like Clubs Detonate kills it)
@@ -606,16 +623,59 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
       }
     } else if (card.suit === 'spades') {
       if (power === 1) {
-        // Tank
-        card.isTank = true;
-        logEvent(state, `${card.suit.toUpperCase()} ${card.value} is placed forward as a Tank!`);
+        // Power 1: Scythe Sweep (AOE damage to all enemy board cards, self-destructs)
+        shouldPlaceOnBoard = false;
+        logEvent(state, `Scythe Sweep! Deals ${card.value} Spades damage to all enemy board cards.`);
+        
+        // Loop backwards to handle defeated cards safely
+        for (let i = oppState.board.length - 1; i >= 0; i--) {
+          const ec = oppState.board[i];
+          if (ec.shield) {
+            const shieldThreshold = ec.value;
+            if (card.value > shieldThreshold) {
+              ec.shield = false;
+              ec.hp -= card.value;
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield breaks! Takes ${card.value} damage.`);
+            } else {
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield absorbs Scythe Sweep damage.`);
+            }
+          } else {
+            ec.hp -= card.value;
+            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} takes ${card.value} damage.`);
+          }
+          
+          if (ec.hp <= 0) {
+            oppState.board.splice(i, 1);
+            oppState.defeated.push(ec);
+            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Scythe Sweep!`);
+          }
+        }
+        pState.defeated.push(card);
       } else {
-        // Stun enemy card
+        // Power 2: Shield Strike (damage to single enemy card, stays on board)
         if (targetInfo) {
-          const enemyCard = oppState.board.find(c => c.id === targetInfo);
-          if (enemyCard) {
-            enemyCard.stunnedTurns = 1;
-            logEvent(state, `Stuns enemy card ${enemyCard.suit.toUpperCase()} ${enemyCard.rank || enemyCard.value} for 1 turn.`);
+          const ecIdx = oppState.board.findIndex(c => c.id === targetInfo);
+          if (ecIdx !== -1) {
+            const ec = oppState.board[ecIdx];
+            if (ec.shield) {
+              const shieldThreshold = ec.value;
+              if (card.value > shieldThreshold) {
+                ec.shield = false;
+                ec.hp -= card.value;
+                logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield breaks! Takes ${card.value} damage.`);
+              } else {
+                logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} shield absorbs damage.`);
+              }
+            } else {
+              ec.hp -= card.value;
+              logEvent(state, `Shield Strike! Deals ${card.value} Spades damage to enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value}.`);
+            }
+            
+            if (ec.hp <= 0) {
+              oppState.board.splice(ecIdx, 1);
+              oppState.defeated.push(ec);
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Shield Strike!`);
+            }
           }
         }
       }
@@ -673,6 +733,7 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
           resCard.isTank = false;
           resCard.stunnedTurns = 0;
           resCard.underlays = [];
+          resCard.playedThisTurn = true; // summoning sickness
           
           pState.board.push(resCard);
           logEvent(state, `Resurrect Less: Summons ${resCard.suit.toUpperCase()} ${resCard.value} with stats ${resCard.atk}/${resCard.hp} to board.`);
@@ -683,6 +744,7 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
     }
   });
   
+  card.playedThisTurn = true; // summoning sickness
   if (shouldPlaceOnBoard) {
     pState.board.push(card);
   }
@@ -696,8 +758,12 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
 export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = null) {
   const active = state.activePlayer;
   const pState = state.players[active];
-  const opp = active === 'A' ? 'B' : 'A';
-  const oppState = state.players[opp];
+  
+  const limit = getPlayLimit(pState.lp);
+  if (pState.cardsPlayedThisTurn >= limit) {
+    logEvent(state, `Cannot play card. Exceeded play limit of ${limit} cards based on health!`);
+    return state;
+  }
   
   const cardIdx = pState.hand.findIndex(c => c.id === cardId);
   if (cardIdx === -1) return state;
@@ -718,6 +784,14 @@ export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = n
     }
   });
   
+  card.playedThisTurn = true; // summoning sickness
+  
+  if (card.rank === 'A') {
+    shouldPlaceOnBoard = false;
+    pState.defeated.push(card);
+    logEvent(state, `Ace of ${card.suit.toUpperCase()} consumed and sent to Defeated Pile.`);
+  }
+  
   if (shouldPlaceOnBoard) {
     pState.board.push(card);
   }
@@ -732,6 +806,12 @@ export function playUnderlayAce(state, aceId, targetEliteId, chosenAbilityIndex,
   const active = state.activePlayer;
   const pState = state.players[active];
   
+  const limit = getPlayLimit(pState.lp);
+  if (pState.cardsPlayedThisTurn >= limit) {
+    logEvent(state, `Cannot play card. Exceeded play limit of ${limit} cards based on health!`);
+    return state;
+  }
+  
   const aceIdx = pState.hand.findIndex(c => c.id === aceId);
   if (aceIdx === -1) return state;
   const ace = pState.hand[aceIdx];
@@ -739,8 +819,14 @@ export function playUnderlayAce(state, aceId, targetEliteId, chosenAbilityIndex,
   const targetElite = pState.board.find(c => c.id === targetEliteId);
   if (!targetElite || !targetElite.isElite) return state;
   
+  if (ace.suit === targetElite.suit) {
+    logEvent(state, `Cannot underlay Ace of ${ace.suit.toUpperCase()} under Elite of the SAME suit!`);
+    return state;
+  }
+  
   // Remove Ace from hand
   pState.hand.splice(aceIdx, 1);
+  pState.cardsPlayedThisTurn += 1;
   pState.underlaysPlayedThisTurn += 1;
   
   // Attach Ace under Target Elite
@@ -998,17 +1084,8 @@ export function executeCombat(state, attackerId, defenderId) {
   
   if (!attacker || !defender) return state;
   
-  if (attacker.stunnedTurns > 0) {
-    logEvent(state, `Stunned card cannot attack!`);
-    return state;
-  }
-  
-  // Can only attack if it has remaining attacks (default is 1 per turn, but diamonds elites can do more)
-  const maxAttacks = attacker.isElite && attacker.suit === 'diamonds' ? 
-    (attacker.rank === 'J' ? 2 : attacker.rank === 'Q' ? 3 : 4) : 1;
-    
-  if (attacker.attackedThisTurn >= maxAttacks) {
-    logEvent(state, `Attacker has already used all available attacks this turn!`);
+  if (!canCardAttack(attacker)) {
+    logEvent(state, `Attacker is not able to attack! (Stunned, Summoning Sickness, or Max Attacks reached)`);
     return state;
   }
   
@@ -1119,16 +1196,8 @@ export function executeAttackPlayer(state, attackerId) {
   const attacker = pState.board.find(c => c.id === attackerId);
   if (!attacker) return state;
   
-  if (attacker.stunnedTurns > 0) {
-    logEvent(state, `Stunned card cannot attack!`);
-    return state;
-  }
-  
-  const maxAttacks = attacker.isElite && attacker.suit === 'diamonds' ? 
-    (attacker.rank === 'J' ? 2 : attacker.rank === 'Q' ? 3 : 4) : 1;
-    
-  if (attacker.attackedThisTurn >= maxAttacks) {
-    logEvent(state, `Attacker has already used all available attacks this turn!`);
+  if (!canCardAttack(attacker)) {
+    logEvent(state, `Attacker is not able to attack! (Stunned, Summoning Sickness, or Max Attacks reached)`);
     return state;
   }
   

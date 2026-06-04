@@ -33,32 +33,37 @@ export function getPairedSubsectionId(subId) {
 
 // Generate a card object
 export function createCard(suit, value, isElite = false, rank = null) {
+  const isAce = rank === 'A';
+  const cardAtk = isAce ? 0 : value;
+  const cardHp = isAce ? 0 : value;
+
   return {
     id: `${suit}_${rank || value}`,
     suit,
     value,
     rank,
     isElite,
-    baseAtk: value,
-    baseHp: value,
-    atk: value,
-    hp: value,
-    maxHp: value,
+    baseAtk: cardAtk,
+    baseHp: cardHp,
+    atk: cardAtk,
+    hp: cardHp,
+    maxHp: cardHp,
     shield: false,
     isTank: false,
     stunnedTurns: 0,
     underlays: [], // Attached Ace cards
     attackedThisTurn: 0, // Number of times attacked this turn
-    hasHaste: false // Diamonds Strike ability
+    hasHaste: false, // Diamonds Strike ability
+    playedThisTurn: false
   };
 }
 
 // Generate the 16 Elite cards face-up
 export function generateElites() {
   const ranks = [
-    { rank: 'J', value: 11 },
-    { rank: 'Q', value: 12 },
-    { rank: 'K', value: 13 },
+    { rank: 'J', value: 12 },
+    { rank: 'Q', value: 13 },
+    { rank: 'K', value: 14 },
     { rank: 'A', value: 14 }
   ];
   const elites = [];
@@ -83,37 +88,24 @@ export function shuffle(array) {
 // Build a deck according to the spacing constraint
 export function buildDeck(normalCards, eliteCards) {
   const shuffledNormals = shuffle(normalCards);
-  const shuffledElites = shuffle(eliteCards);
+  const shuffledElites = shuffle(eliteCards); // 8 elites
 
   const Nnorm = shuffledNormals.length;
-  const Gbase = Math.floor(Nnorm / 4);
-  const R = Nnorm % 4;
-
-  // Determine group sizes for normal cards
-  const groupSizes = [Gbase, Gbase, Gbase, Gbase];
-  for (let i = 0; i < R; i++) {
-    groupSizes[i] += 1;
-  }
-
-  // Populate the deck template:
-  // [G1 Normals] -> [Elite 1] -> [G2 Normals] -> [Elite 2] -> [G3 Normals] -> [Elite 3] -> [G4 Normals] -> [Elite 4]
   const deck = [];
-  let normalIdx = 0;
-  let eliteIdx = 0;
-
-  for (let i = 0; i < 4; i++) {
-    const size = groupSizes[i];
-    // Add normal cards
-    for (let j = 0; j < size; j++) {
-      if (normalIdx < shuffledNormals.length) {
-        deck.push(shuffledNormals[normalIdx++]);
-      }
-    }
-    // Add elite card
-    if (eliteIdx < shuffledElites.length) {
-      deck.push(shuffledElites[eliteIdx++]);
-    }
+  
+  // The top of the deck has the first (Nnorm - 8) normal cards
+  const topNormalsCount = Nnorm - 8;
+  for (let i = 0; i < topNormalsCount; i++) {
+    deck.push(shuffledNormals[i]);
   }
-
+  
+  // The bottom of the deck alternates Normal, Elite (8 times)
+  let normalIdx = topNormalsCount;
+  let eliteIdx = 0;
+  for (let i = 0; i < 8; i++) {
+    deck.push(shuffledNormals[normalIdx++]);
+    deck.push(shuffledElites[eliteIdx++]);
+  }
+  
   return deck;
 }

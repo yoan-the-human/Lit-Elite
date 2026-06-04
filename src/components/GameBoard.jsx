@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import Card from './Card';
 import { SUIT_LABELS } from '../game/deckBuilder';
+import { getPlayLimit } from '../game/gameEngine';
 
 export default function GameBoard({ 
   gameState, 
@@ -50,8 +51,8 @@ export default function GameBoard({
         { title: 'Power 2 (Damage)', desc: 'Deal direct damage equal to card value to opponent LP.' }
       ];
       case 'spades': return [
-        { title: 'Power 1 (Tank)', desc: 'Place card in the front lane. Enemy must attack Tanks first.' },
-        { title: 'Power 2 (Stun)', desc: 'Stun an enemy card. It cannot attack on their next turn.' }
+        { title: 'Power 1 (Scythe Sweep)', desc: 'Deal damage equal to card value to all enemy board cards. Card is defeated.' },
+        { title: 'Power 2 (Shield Strike)', desc: 'Deal damage equal to card value to one enemy board card. Card stays on board.' }
       ];
       case 'clubs': return [
         { title: 'Power 1 (Detonate)', desc: 'Deals damage equal to card value to all enemy board cards. Self-destructs.' },
@@ -322,18 +323,19 @@ export default function GameBoard({
     const normalLane = boardCards.filter(c => !c.isTank);
     const tankLane = boardCards.filter(c => c.isTank);
 
-    const isOpp = playerOwner === oppPlayer;
+    const isTopPlayer = playerOwner === 'B';
 
     const renderCardInstance = (card) => {
+      const isOpponentOfActive = playerOwner !== activePlayer;
       let isTargetable = false;
-      if (targetingMode === 'STUN' && isOpp) isTargetable = true;
-      if (targetingMode === 'HEAL' && !isOpp) isTargetable = true;
-      if (targetingMode === 'MIND_CONTROL' && isOpp) {
+      if (targetingMode === 'STUN' && isOpponentOfActive) isTargetable = true;
+      if (targetingMode === 'HEAL' && !isOpponentOfActive) isTargetable = true;
+      if (targetingMode === 'MIND_CONTROL' && isOpponentOfActive) {
         const limit = limitForRank(selectedHandCard.rank);
         if (card.atk <= limit) isTargetable = true;
       }
-      if (isUnderlayTargeting && !isOpp && card.isElite) isTargetable = true;
-      if (targetingMode === 'ATTACK' && isOpp) {
+      if (isUnderlayTargeting && !isOpponentOfActive && card.isElite) isTargetable = true;
+      if (targetingMode === 'ATTACK' && isOpponentOfActive) {
         const tanks = oppPState.board.filter(c => c.isTank);
         if (tanks.length > 0) {
           isTargetable = card.isTank; // Must attack tank
@@ -352,11 +354,11 @@ export default function GameBoard({
       );
     };
 
-    // Return lanes in order: for opponent, tanks are at the bottom (facing center).
-    // For friendly player, tanks are at the top (facing center).
+    // Return lanes in order: for opponent (Player B/top), tanks are at the bottom (facing center).
+    // For friendly player (Player A/bottom), tanks are at the top (facing center).
     return (
       <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '8px' }}>
-        {isOpp ? (
+        {isTopPlayer ? (
           <>
             {/* Back Row */}
             <div className="board-lane">{normalLane.map(renderCardInstance)}</div>
@@ -382,7 +384,7 @@ export default function GameBoard({
         <div className="targeting-indicator-banner">
           <span>
             {targetingMode === 'HEAL' && "Select a friendly card or click your LP bar to Heal!"}
-            {targetingMode === 'STUN' && "Select an enemy card to Stun!"}
+            {targetingMode === 'STUN' && (selectedHandCard?.suit === 'spades' ? "Select an enemy card to Shield Strike!" : "Select an enemy card to Stun!")}
             {targetingMode === 'MIND_CONTROL' && "Select an enemy card with low enough ATK to Mind Control!"}
             {targetingMode === 'ATTACK' && "Select an enemy card or click enemy LP (if no board cards) to Attack!"}
           </span>
@@ -424,43 +426,65 @@ export default function GameBoard({
       )}
 
       <div className="battlefield">
-        {/* Opponent Info Header */}
-        <div className="player-banner" style={{ borderBottomColor: activePlayer === oppPlayer ? 'var(--color-hearts)' : 'var(--border-light)' }}>
+        {/* Opponent (Player B) Info Header */}
+        <div className="player-banner" style={{ borderBottomColor: activePlayer === 'B' ? 'var(--color-hearts)' : 'var(--border-light)' }}>
           <div className="player-info-left">
-            <span className="player-name" style={{ color: activePlayer === oppPlayer ? 'var(--color-hearts)' : 'inherit' }}>
-              {oppPState.name} {activePlayer === oppPlayer && '•'}
+            <span className="player-name" style={{ color: activePlayer === 'B' ? 'var(--color-hearts)' : 'inherit' }}>
+              {pB.name} {activePlayer === 'B' && '•'}
             </span>
             <div className="hp-bar-container">
-              <div className="hp-bar-fill" style={{ width: `${(oppPState.lp / 150) * 100}%` }} />
+              <div className="hp-bar-fill" style={{ width: `${(pB.lp / 150) * 100}%` }} />
             </div>
-            {oppPState.has10CardBuff && <span className="active-buff-badge">10-CARD HAND BUFF</span>}
+            {pB.has10CardBuff && <span className="active-buff-badge">10-CARD HAND BUFF</span>}
           </div>
-          <div 
-            className="lp-counter"
-            onClick={oppPState.board.length === 0 ? handleOpponentLpAttackClick : undefined}
-            style={{
-              cursor: (targetingMode === 'ATTACK' && oppPState.board.length === 0) ? 'pointer' : 'default',
-              animation: (targetingMode === 'ATTACK' && oppPState.board.length === 0) ? 'pulse-alert 1s infinite alternate' : 'none',
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="play-limit-indicator" style={{ 
+              fontSize: '0.85rem', 
+              color: 'var(--text-dim)', 
+              background: 'rgba(255,255,255,0.05)',
               padding: '2px 8px',
-              borderRadius: '6px',
-              border: (targetingMode === 'ATTACK' && oppPState.board.length === 0) ? '2px solid var(--color-hearts)' : 'none'
-            }}
-          >
-            LP: {oppPState.lp}
+              borderRadius: '4px',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }}>
+              Plays: {pB.cardsPlayedThisTurn}/{getPlayLimit(pB.lp)}
+            </div>
+            <div 
+              className="lp-counter"
+              onClick={activePlayer === 'B' && targetingMode === 'HEAL' ? handleLpHealClick : (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0 ? handleOpponentLpAttackClick : undefined)}
+              style={{
+                cursor: (activePlayer === 'B' && targetingMode === 'HEAL') || (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0) ? 'pointer' : 'default',
+                animation: (activePlayer === 'B' && targetingMode === 'HEAL') || (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0) ? 'pulse-alert 1s infinite alternate' : 'none',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                border: (activePlayer === 'B' && targetingMode === 'HEAL') ? '2px solid var(--color-clubs)' : (activePlayer === 'A' && targetingMode === 'ATTACK' && pB.board.length === 0 ? '2px solid var(--color-hearts)' : 'none')
+              }}
+            >
+              LP: {pB.lp}
+            </div>
           </div>
         </div>
 
-        {/* Opponent Hand (Back face) */}
+        {/* Player B Hand */}
         <div className="hand-container" style={{ transform: 'rotate(0)' }}>
-          {oppPState.hand.map((card, i) => (
-            <Card key={card.id || i} card={card} showBack={true} />
-          ))}
+          {pB.hand.map((card, i) => {
+            const showBack = gameState.mode === 'ai' ? true : (activePlayer !== 'B');
+            const isPlayable = activePlayer === 'B' && gameState.mode !== 'ai' && !winner;
+            return (
+              <Card 
+                key={card.id || i} 
+                card={card} 
+                showBack={showBack} 
+                onClick={isPlayable ? () => handleHandCardClick(card) : undefined}
+                isPlayable={isPlayable}
+              />
+            );
+          })}
         </div>
 
         {/* Battlefield middle card grid lanes */}
         <div className="board-zone">
-          {/* Opponent board */}
-          {renderBoardLane(oppPState.board, oppPlayer)}
+          {/* Opponent board (Player B) */}
+          {renderBoardLane(pB.board, 'B')}
           
           {/* Controls line */}
           <div className="game-controls-divider">
@@ -476,26 +500,28 @@ export default function GameBoard({
             </button>
           </div>
 
-          {/* Friendly board */}
+          {/* Friendly board (Player A) */}
           {renderBoardLane(pA.board, 'A')}
         </div>
 
-        {/* Friendly Hand */}
+        {/* Friendly Hand (Player A) */}
         <div className="hand-container">
-          {pA.hand.map((card) => {
-            const isPlayable = activePlayer === 'A' && !isAiTurn && !winner;
+          {pA.hand.map((card, i) => {
+            const showBack = gameState.mode === 'ai' ? false : (activePlayer !== 'A');
+            const isPlayable = activePlayer === 'A' && !winner;
             return (
               <Card 
-                key={card.id} 
+                key={card.id || i} 
                 card={card} 
-                onClick={() => handleHandCardClick(card)}
+                showBack={showBack}
+                onClick={isPlayable ? () => handleHandCardClick(card) : undefined}
                 isPlayable={isPlayable}
               />
             );
           })}
         </div>
 
-        {/* Player Info Footer */}
+        {/* Friendly (Player A) Info Footer */}
         <div className="player-banner" style={{ borderTopColor: activePlayer === 'A' ? 'var(--color-spades)' : 'var(--border-light)' }}>
           <div className="player-info-left">
             <span className="player-name" style={{ color: activePlayer === 'A' ? 'var(--color-spades)' : 'inherit' }}>
@@ -506,18 +532,30 @@ export default function GameBoard({
             </div>
             {pA.has10CardBuff && <span className="active-buff-badge">10-CARD HAND BUFF</span>}
           </div>
-          <div 
-            className="lp-counter"
-            onClick={handleLpHealClick}
-            style={{
-              cursor: targetingMode === 'HEAL' ? 'pointer' : 'default',
-              animation: targetingMode === 'HEAL' ? 'pulse-alert 1s infinite alternate' : 'none',
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div className="play-limit-indicator" style={{ 
+              fontSize: '0.85rem', 
+              color: 'var(--text-dim)', 
+              background: 'rgba(255,255,255,0.05)',
               padding: '2px 8px',
-              borderRadius: '6px',
-              border: targetingMode === 'HEAL' ? '2px solid var(--color-clubs)' : 'none'
-            }}
-          >
-            LP: {pA.lp}
+              borderRadius: '4px',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }}>
+              Plays: {pA.cardsPlayedThisTurn}/{getPlayLimit(pA.lp)}
+            </div>
+            <div 
+              className="lp-counter"
+              onClick={activePlayer === 'A' && targetingMode === 'HEAL' ? handleLpHealClick : (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0 ? handleOpponentLpAttackClick : undefined)}
+              style={{
+                cursor: (activePlayer === 'A' && targetingMode === 'HEAL') || (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0) ? 'pointer' : 'default',
+                animation: (activePlayer === 'A' && targetingMode === 'HEAL') || (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0) ? 'pulse-alert 1s infinite alternate' : 'none',
+                padding: '2px 8px',
+                borderRadius: '6px',
+                border: (activePlayer === 'A' && targetingMode === 'HEAL') ? '2px solid var(--color-clubs)' : (activePlayer === 'B' && targetingMode === 'ATTACK' && pA.board.length === 0 ? '2px solid var(--color-hearts)' : 'none')
+              }}
+            >
+              LP: {pA.lp}
+            </div>
           </div>
         </div>
       </div>

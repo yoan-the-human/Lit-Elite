@@ -1,4 +1,4 @@
-import { playNormalCard, playEliteCard, playUnderlayAce, executeCombat, executeAttackPlayer, healCharacter, endTurn } from './gameEngine.js';
+import { playNormalCard, playEliteCard, playUnderlayAce, executeCombat, executeAttackPlayer, healCharacter, endTurn, getPlayLimit, canCardAttack } from './gameEngine.js';
 
 // Main AI trigger called during the gameplay loop when it is B's turn
 export function runAiGameplayTurn(state, updateStateCallback) {
@@ -15,7 +15,7 @@ export function runAiGameplayTurn(state, updateStateCallback) {
   const pA = currentState.players.A;
 
   // 1. Play Cards from Hand
-  const playLimit = pB.has10CardBuff ? 3 : 1;
+  const playLimit = getPlayLimit(pB.lp);
   if (pB.cardsPlayedThisTurn < playLimit && pB.hand.length > 0) {
     // Find a playable card
     // Prioritize Elites, then normal cards
@@ -40,10 +40,7 @@ export function runAiGameplayTurn(state, updateStateCallback) {
 
   // 2. Perform Attacks with board cards
   const attackingCard = pB.board.find(c => {
-    if (c.stunnedTurns > 0) return false;
-    const maxAttacks = c.isElite && c.suit === 'diamonds' ? 
-      (c.rank === 'J' ? 2 : c.rank === 'Q' ? 3 : 4) : 1;
-    return c.attackedThisTurn < maxAttacks;
+    return canCardAttack(c);
   });
 
   if (attackingCard) {
@@ -151,10 +148,13 @@ function playAiElite(state, card) {
 
   // Handle underlay play specifically
   if (card.rank === 'A' && abilityIdx === 0) {
-    const targetElite = pB.board.find(c => c.isElite && c.id !== card.id);
+    const targetElite = pB.board.find(c => c.isElite && c.id !== card.id && c.suit !== card.suit);
     if (targetElite) {
       // Choose index 0 of underlaid Ace suit for simplicity for the target card
       return playUnderlayAce(state, card.id, targetElite.id, 0);
+    } else {
+      // Fallback to action effect if no valid same-suit-restricted target exists
+      abilityIdx = 1;
     }
   }
 
@@ -201,17 +201,14 @@ function playAiNormal(state, card) {
       powerIdx = 1; // direct damage
     }
   } else if (card.suit === 'spades') {
-    // Become tank if we have no tank, else stun enemy
-    const hasTank = pB.board.some(c => c.isTank);
-    if (!hasTank) {
-      powerIdx = 0; // Tank
-    } else if (oppState.board.length > 0) {
-      powerIdx = 1; // Stun
-      // Target strongest enemy card
-      const strongestOpp = oppState.board.sort((a, b) => b.atk - a.atk)[0];
-      targetInfo = strongestOpp.id;
+    // Sweep if opponent board is crowded, else strike single target
+    if (oppState.board.length >= 2) {
+      powerIdx = 0; // Scythe Sweep (AoE)
+    } else if (oppState.board.length === 1) {
+      powerIdx = 1; // Shield Strike (Single target)
+      targetInfo = oppState.board[0].id;
     } else {
-      powerIdx = 0; // Tank fallback
+      powerIdx = 1; // Stays on board (fallback to power 2 since no targets to sweep/strike)
     }
   } else if (card.suit === 'clubs') {
     // Resurrect if available, else detonate if enemy board has cards

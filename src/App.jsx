@@ -217,7 +217,7 @@ export default function App() {
           }
           setGameState(updatedState);
         });
-      }, 1200); // 1.2s delay for AI thinking feel
+      }, 3000); // 3s delay for AI thinking feel
       return () => clearTimeout(timer);
     }
   }, [gameState]);
