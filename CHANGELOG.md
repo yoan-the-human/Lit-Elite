@@ -2,6 +2,18 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+## [0.1.0](https://github.com/yoan-the-human/morld/compare/v0.0.3...v0.1.0) (2026-06-04)
+
+
+### 🐛 Бъгове
+
+* now elite cards can be picked ([db79cd8](https://github.com/yoan-the-human/morld/commit/db79cd882c860edf9edfb9b2e7f3e2a42436e8ce))
+
+
+### 🚀 Новости
+
+* a lot of stuff ([4a61737](https://github.com/yoan-the-human/morld/commit/4a617371604613d7e32911c8632ba3fd51372b61))
+
 ### [0.0.3](https://github.com/yoan-the-human/morld/compare/v0.0.2...v0.0.3) (2026-06-03)
 
 
