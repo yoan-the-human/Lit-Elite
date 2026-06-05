@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [0.2.1](https://github.com/yoan-the-human/morld/compare/v0.2.0...v0.2.1) (2026-06-05)
+
+
+### 🚀 Новости
+
+* new spades power ([fcdea4c](https://github.com/yoan-the-human/morld/commit/fcdea4cd1ca13bfc20d5871c584776fc2059b971))
+
 ## [0.2.0](https://github.com/yoan-the-human/morld/compare/v0.1.3...v0.2.0) (2026-06-04)
 
 
