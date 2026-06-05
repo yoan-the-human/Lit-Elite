@@ -239,7 +239,7 @@ export default function App() {
       <div className="welcome-screen">
         <h1 className="welcome-logo">Lit Elite</h1>
         <p className="welcome-subtitle">
-          Siberian-Grade 1v1 Card Combat. Assemble your deck through Odd/Even drafting, space your Elites, and command custom card powers to crush opponent LP.
+          New era of normal card gameplay. Assemble your deck and crush your opponent. Be victorious. Become a legend.
         </p>
         
         {showAiFirstChoice ? (
@@ -274,7 +274,7 @@ export default function App() {
         )}
         
         <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
-          Version 1.0.0 (Offline Mode) • Glory to the Motherland!
+          Version 0.2.5 (Offline Mode) • Alpha
         </div>
       </div>
     );
