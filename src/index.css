@@ -199,3 +199,13 @@ body {
   border-color: #6366f1 !important;
 }
 
+/* Stunned cards targetable cursor override */
+.opponent-lane .card-element.stunned {
+  cursor: default;
+}
+
+.opponent-lane .card-element.stunned.targetable {
+  cursor: pointer;
+}
+
+

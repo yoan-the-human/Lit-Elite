@@ -150,10 +150,10 @@ export default function App() {
     });
   };
 
-  const handlePlayUnderlay = (aceId, targetEliteId, abilityIdx) => {
+  const handlePlayUnderlay = (aceId, targetEliteId, abilityIdx, extraParams) => {
     setGameState(prev => {
       const next = structuredClone(prev);
-      return playUnderlayAce(next, aceId, targetEliteId, abilityIdx);
+      return playUnderlayAce(next, aceId, targetEliteId, abilityIdx, extraParams);
     });
   };
 

@@ -110,11 +110,11 @@ function playAiElite(state, card) {
     if (card.rank === 'A') {
       abilityIdx = 1; // Stun entire board (4 turns)
     } else {
-      // Prefer Tank & Stun if opponent has board cards, else Shield
+      // Prefer Sunder (ATK/HP reduce) if opponent has board cards, else Tank & Stun
       if (oppState.board.length > 0) {
-        abilityIdx = 0;
-      } else {
         abilityIdx = 1;
+      } else {
+        abilityIdx = 0;
       }
     }
   } else if (card.suit === 'clubs') {

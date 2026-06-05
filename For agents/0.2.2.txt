@@ -1,0 +1,3 @@
+for example I have a 6 and a 4 on my board, the enemy has a 10 which is tank, its my turn, I play 2 of spades with stun and I stun the 10. Here is what should happens: when a tank is stunned he cannot tank, I should be able to freely attack other cards or enemy lp. In my case I decide to attack with 6 and 4 the 10. I defeat it, but my cards are not defeated, because the 10 is stunned and cannot do 10 damage to them, so I also don't get excess damage to my LP. 
+
+the elites of spades second power should be able to see from own deck and from defeated deck but if drown from defeated they should take damage because they made a draw from there. 

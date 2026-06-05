@@ -848,12 +848,17 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
           if (ecIdx !== -1) {
             const enemyCard = oppState.board[ecIdx];
             if (enemyCard.atk <= limit) {
-              oppState.board.splice(ecIdx, 1);
-              // Clean up stuns/tanks before joining new board
-              enemyCard.isTank = false;
-              enemyCard.stunnedTurns = 0;
-              pState.board.push(enemyCard);
-              logEvent(state, `MIND CONTROL! Steals enemy card ${enemyCard.suit.toUpperCase()} ${enemyCard.rank || enemyCard.value}`);
+              if (enemyCard.shield) {
+                enemyCard.shield = false;
+                logEvent(state, `Mind Control on ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()} is blocked by Shield! Shield is removed.`);
+              } else {
+                oppState.board.splice(ecIdx, 1);
+                // Clean up stuns/tanks before joining new board
+                enemyCard.isTank = false;
+                enemyCard.stunnedTurns = 0;
+                pState.board.push(enemyCard);
+                logEvent(state, `MIND CONTROL! Steals enemy card ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()}`);
+              }
             }
           }
         }
@@ -888,17 +893,40 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
     }
   } else if (suit === 'spades') {
     if (rank === 'J' || rank === 'Q' || rank === 'K') {
-      // [0] Tank & Stun for 1/2/3 turns, [1] Protective Shield
+      // [0] Tank & Stun for 1/2/3 turns, [1] Pick and Draw Elite card
       const turns = rank === 'J' ? 1 : rank === 'Q' ? 2 : 3;
       if (abilityIdx === 0) {
         targetElite.isTank = true;
         oppState.board.forEach(ec => {
           ec.stunnedTurns = turns;
         });
-        logEvent(state, `Elite ${targetElite.rank} of SPADES becomes a Tank and STUNS all enemy board cards for ${turns} turns!`);
+        logEvent(state, `${targetElite.rank} of SPADES becomes a Tank and STUNS all enemy board cards for ${turns} turns!`);
       } else {
-        targetElite.shield = true;
-        logEvent(state, `Elite ${targetElite.rank} of SPADES gains a Protective Shield (broken only by damage > ${targetElite.value}).`);
+        let chosenCardId = extraParams && extraParams.searchCardId;
+        const allowedRanks = rank === 'J' ? ['A', 'J'] : rank === 'Q' ? ['A', 'J', 'Q'] : ['A', 'J', 'Q', 'K'];
+        
+        if (!chosenCardId) {
+          // If no card ID is passed (e.g. AI is playing), automatically choose the best one from the deck
+          const eligibleInDeck = pState.deck.filter(c => c.isElite && allowedRanks.includes(c.rank));
+          if (eligibleInDeck.length > 0) {
+            const rankOrder = { 'A': 4, 'K': 3, 'Q': 2, 'J': 1 };
+            eligibleInDeck.sort((a, b) => (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0));
+            chosenCardId = eligibleInDeck[0].id;
+          }
+        }
+        
+        if (chosenCardId) {
+          const deckIdx = pState.deck.findIndex(c => c.id === chosenCardId);
+          if (deckIdx !== -1) {
+            const cardToDraw = pState.deck[deckIdx];
+            pState.deck.splice(deckIdx, 1);
+            pState.hand.push(cardToDraw);
+            logEvent(state, `${pState.name} searches deck and draws ${cardToDraw.rank} of ${cardToDraw.suit.toUpperCase()}.`);
+            update10CardBuff(pState);
+          }
+        } else {
+          logEvent(state, `${pState.name} searches deck but finds no eligible Elite cards.`);
+        }
       }
     } else if (rank === 'A') {
       // Ace: [0] Underlay, [1] Stun entire board for 4 turns
@@ -1022,6 +1050,7 @@ export function executeCombat(state, attackerId, defenderId) {
   let defenderDmgDealt = defender.atk;
   
   const defenderPrevHp = defender.hp;
+  const attackerPrevHp = attacker.hp;
   
   // 1. Resolve damage to defender (with shield check)
   let actualDmgToDefender = 0;

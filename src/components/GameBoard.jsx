@@ -30,6 +30,11 @@ export default function GameBoard({
   const [selectedEliteForUnderlay, setSelectedEliteForUnderlay] = useState(null);
   const [isUnderlayPowerModalOpen, setIsUnderlayPowerModalOpen] = useState(false);
 
+  // Search Deck UI state
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [searchAllowedRanks, setSearchAllowedRanks] = useState([]);
+  const [searchConfirmCallback, setSearchConfirmCallback] = useState(null);
+
   // General targeting state
   const [targetingMode, setTargetingMode] = useState(null); // 'HEAL' | 'STUN' | 'MIND_CONTROL' | 'ATTACK'
   const [attackerCard, setAttackerCard] = useState(null); // Attacker card for combat targeting
@@ -101,9 +106,10 @@ export default function GameBoard({
         'Global Stun: Stun all board cards (both players) for 4 turns'
       ];
       const turns = rank === 'J' ? 1 : rank === 'Q' ? 2 : 3;
+      const allowedText = rank === 'J' ? 'A or J' : rank === 'Q' ? 'A, J or Q' : 'A, J, Q or K';
       return [
         `Become Tank and stun all enemy board cards for ${turns} turn(s)`,
-        `Gain Protective Shield (only broken by single hit > ${limitForRank(rank)})`
+        `Search Elite: Pick one Elite card (${allowedText}) from deck and draw it`
       ];
     }
     if (suit === 'clubs') {
@@ -204,6 +210,19 @@ export default function GameBoard({
       return;
     }
 
+    // Spades Search Elite from Deck (index 1 for J, Q, K)
+    if (suit === 'spades' && rank !== 'A' && abilityIdx === 1) {
+      const allowed = rank === 'J' ? ['A', 'J'] : rank === 'Q' ? ['A', 'J', 'Q'] : ['A', 'J', 'Q', 'K'];
+      setSearchAllowedRanks(allowed);
+      setSearchConfirmCallback(() => (chosenCardId) => {
+        onPlayElite(selectedHandCard.id, 1, { searchCardId: chosenCardId });
+        resetSearchState();
+        resetStates();
+      });
+      setIsSearchModalOpen(true);
+      return;
+    }
+
     // Direct elite play with no targeting
     onPlayElite(selectedHandCard.id, abilityIdx);
     resetStates();
@@ -284,6 +303,19 @@ export default function GameBoard({
   // Resolve underlay Ace power option
   const handleSelectUnderlayPower = (abilityIdx) => {
     setIsUnderlayPowerModalOpen(false);
+
+    if (pendingUnderlayAce.suit === 'spades' && abilityIdx === 1) {
+      const allowed = selectedEliteForUnderlay.rank === 'J' ? ['A', 'J'] : selectedEliteForUnderlay.rank === 'Q' ? ['A', 'J', 'Q'] : ['A', 'J', 'Q', 'K'];
+      setSearchAllowedRanks(allowed);
+      setSearchConfirmCallback(() => (chosenCardId) => {
+        onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 1, { searchCardId: chosenCardId });
+        resetSearchState();
+        resetStates();
+      });
+      setIsSearchModalOpen(true);
+      return;
+    }
+
     onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, abilityIdx);
     resetStates();
   };
@@ -303,6 +335,12 @@ export default function GameBoard({
     }
   };
 
+  const resetSearchState = () => {
+    setIsSearchModalOpen(false);
+    setSearchAllowedRanks([]);
+    setSearchConfirmCallback(null);
+  };
+
   const resetStates = () => {
     setSelectedHandCard(null);
     setSelectedPowerIdx(null);
@@ -314,6 +352,7 @@ export default function GameBoard({
     setPendingUnderlayAce(null);
     setSelectedEliteForUnderlay(null);
     setIsUnderlayPowerModalOpen(false);
+    resetSearchState();
   };
 
   // Cancel action
@@ -375,8 +414,10 @@ export default function GameBoard({
     const showNormal = normalLane.length > 0 || tankLane.length === 0;
     const showTank = tankLane.length > 0;
 
+    const laneClass = playerOwner === activePlayer ? 'friendly-lane' : 'opponent-lane';
+
     return (
-      <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '8px' }}>
+      <div className={laneClass} style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '8px' }}>
         {isTopPlayer ? (
           <>
             {/* Back Row */}
@@ -684,6 +725,71 @@ export default function GameBoard({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Search Elite Card from Deck Modal */}
+      {isSearchModalOpen && (
+        <div className="card-modal-backdrop" onClick={handleCancelAction}>
+          <div className="glass-panel card-modal-content" onClick={(e) => e.stopPropagation()} style={{ borderTop: '4px solid var(--color-spades)', maxWidth: '600px', width: '90%' }}>
+            <h3 style={{ fontSize: '1.5rem', fontWeight: '700' }}>Search Elite from Deck</h3>
+            <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '16px' }}>
+              Choose one Elite card of rank ({searchAllowedRanks.join(', ')}) from your deck to draw into your hand:
+            </p>
+
+            {(() => {
+              const myDeck = activePlayer === 'A' ? pA.deck : pB.deck;
+              const eligibleElites = myDeck.filter(c => c.isElite && searchAllowedRanks.includes(c.rank));
+
+              if (eligibleElites.length === 0) {
+                return (
+                  <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                    <p style={{ color: 'var(--text-bright)', fontWeight: '600', marginBottom: '15px' }}>
+                      No eligible Elite cards found in your deck.
+                    </p>
+                    <button 
+                      className="btn-premium btn-spades" 
+                      onClick={() => {
+                        if (searchConfirmCallback) searchConfirmCallback(null);
+                      }}
+                    >
+                      Confirm (No Draw)
+                    </button>
+                  </div>
+                );
+              }
+
+              return (
+                <div>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '12px', 
+                    flexWrap: 'wrap', 
+                    justifyContent: 'center', 
+                    margin: '20px 0',
+                    maxHeight: '300px',
+                    overflowY: 'auto',
+                    padding: '10px'
+                  }}>
+                    {eligibleElites.map((card, idx) => (
+                      <div 
+                        key={card.id || idx}
+                        style={{ cursor: 'pointer' }}
+                        onClick={() => {
+                          if (searchConfirmCallback) searchConfirmCallback(card.id);
+                        }}
+                      >
+                        <Card card={card} isPlayable={true} />
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'center' }}>
+                    <button className="btn-premium" onClick={handleCancelAction}>Cancel Play</button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
