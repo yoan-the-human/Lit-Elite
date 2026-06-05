@@ -2,6 +2,14 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [0.2.4](https://github.com/yoan-the-human/Lit-Elite/compare/v0.2.3...v0.2.4) (2026-06-05)
+
+
+### 💄 Стил
+
+* new logo ([3ab2ad0](https://github.com/yoan-the-human/Lit-Elite/commit/3ab2ad0ce02c5b2d04e5ee7256ea22df6e5463e4))
+* renaming the game ([a831fa4](https://github.com/yoan-the-human/Lit-Elite/commit/a831fa48497f8cd4947f5d8b2dcb55e4a9827686))
+
 ### [0.2.3](https://github.com/yoan-the-human/Lit-Elite/compare/v0.2.2...v0.2.3) (2026-06-05)
 
 ### [0.2.2](https://github.com/yoan-the-human/lit-elite/compare/v0.2.1...v0.2.2) (2026-06-05)
