@@ -237,7 +237,7 @@ export default function App() {
   if (!gameState) {
     return (
       <div className="welcome-screen">
-        <h1 className="welcome-logo">MORLD</h1>
+        <h1 className="welcome-logo">Lit Elite</h1>
         <p className="welcome-subtitle">
           Siberian-Grade 1v1 Card Combat. Assemble your deck through Odd/Even drafting, space your Elites, and command custom card powers to crush opponent LP.
         </p>
