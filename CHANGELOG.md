@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [0.2.5](https://github.com/yoan-the-human/Lit-Elite/compare/v0.2.4...v0.2.5) (2026-06-05)
+
+
+### 💄 Стил
+
+* welcome message ([957d8a0](https://github.com/yoan-the-human/Lit-Elite/commit/957d8a028e61b1b59b3704a9e02cdc7ce2d5e6bc))
+
 ### [0.2.4](https://github.com/yoan-the-human/Lit-Elite/compare/v0.2.3...v0.2.4) (2026-06-05)
 
 
