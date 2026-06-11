@@ -1,7 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { translateLog } from '../game/translations';
 
-export default function GameLogs({ logs, language = 'en' }) {
+export default function GameLogs({ logs, language = 'en', isEmbedded = false }) {
   const feedEndRef = useRef(null);
 
   useEffect(() => {
@@ -12,7 +12,7 @@ export default function GameLogs({ logs, language = 'en' }) {
   }, [logs]);
 
   return (
-    <div className="sidebar-panel">
+    <div className={isEmbedded ? "logs-embedded" : "sidebar-panel"}>
       <div className="log-feed-header">{language === 'bg' ? 'Дневник на битката' : 'Battle Feed Logs'}</div>
       <div className="log-feed-container">
         {logs.length === 0 ? (

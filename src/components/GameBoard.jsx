@@ -3,6 +3,7 @@ import Card from './Card';
 import { SUIT_LABELS } from '../game/deckBuilder';
 import { getPlayLimit, canCardAttack } from '../game/gameEngine';
 import { TRANSLATIONS } from '../game/translations';
+import GameLogs from './GameLogs';
 
 export default function GameBoard({ 
   gameState, 
@@ -172,6 +173,11 @@ export default function GameBoard({
     return 14;
   };
 
+  const getViableMindControlTargets = (eliteCard) => {
+    const limit = limitForRank(eliteCard.rank);
+    return oppPState.board.filter(c => c.atk <= limit);
+  };
+
   // 1. Hand card selection
   const handleHandCardClick = (card) => {
     if (isAiTurn || winner) return;
@@ -193,10 +199,19 @@ export default function GameBoard({
           // Heal needs target
           setTargetingMode('HEAL');
           setSelectedPowerIdx(0); // arbitrary but registers as play
-        } else if (suit === 'spades' && oppPState.board.length > 0) {
+        } else if (suit === 'spades') {
           // Stun needs target
-          setTargetingMode('STUN');
-          setSelectedPowerIdx(0);
+          const viable = oppPState.board.filter(c => !c.isElite);
+          if (viable.length === 1) {
+            onPlayNormal(card.id, 0, viable[0].id);
+            resetStates();
+          } else if (viable.length > 1) {
+            setTargetingMode('STUN');
+            setSelectedPowerIdx(0);
+          } else {
+            onPlayNormal(card.id, 0);
+            resetStates();
+          }
         } else {
           // No targeting needed, play immediately
           onPlayNormal(card.id, 0);
@@ -217,8 +232,19 @@ export default function GameBoard({
     if (suit === 'hearts' && powerIdx === 0) {
       // Heal needs target
       setTargetingMode('HEAL');
-    } else if ((suit === 'spades' || suit === 'clubs') && powerIdx === 1 && oppPState.board.length > 0) {
-      // Stun / Shield Strike needs target
+    } else if (suit === 'spades' && powerIdx === 1) {
+      const viable = oppPState.board.filter(c => !c.isElite);
+      if (viable.length === 1) {
+        onPlayNormal(selectedHandCard.id, powerIdx, viable[0].id);
+        resetStates();
+      } else if (viable.length > 1) {
+        setTargetingMode('STUN');
+      } else {
+        onPlayNormal(selectedHandCard.id, powerIdx);
+        resetStates();
+      }
+    } else if (suit === 'clubs' && powerIdx === 1 && oppPState.board.length > 0) {
+      // Shield Strike needs target
       setTargetingMode('STUN');
     } else {
       // Plays immediately
@@ -244,7 +270,16 @@ export default function GameBoard({
 
     // Heart mind control (index 0 for J, Q, K)
     if (suit === 'hearts' && rank !== 'A' && abilityIdx === 0) {
-      setTargetingMode('MIND_CONTROL');
+      const viable = getViableMindControlTargets(selectedHandCard);
+      if (viable.length === 1) {
+        onPlayElite(selectedHandCard.id, 0, { targetId: viable[0].id });
+        resetStates();
+      } else if (viable.length > 1) {
+        setTargetingMode('MIND_CONTROL');
+      } else {
+        onPlayElite(selectedHandCard.id, 0);
+        resetStates();
+      }
       return;
     }
 
@@ -290,10 +325,17 @@ export default function GameBoard({
     // Case 3: Mind control targeting
     if (targetingMode === 'MIND_CONTROL' && playerOwner === oppPlayer) {
       // Verify limit
-      const limit = limitForRank(selectedHandCard.rank);
-      if (card.atk <= limit) {
-        onPlayElite(selectedHandCard.id, 0, { targetId: card.id });
-        resetStates();
+      const activeElite = pendingUnderlayAce ? selectedEliteForUnderlay : selectedHandCard;
+      if (activeElite) {
+        const limit = limitForRank(activeElite.rank);
+        if (card.atk <= limit) {
+          if (pendingUnderlayAce) {
+            onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 0, { targetId: card.id });
+          } else {
+            onPlayElite(selectedHandCard.id, 0, { targetId: card.id });
+          }
+          resetStates();
+        }
       }
       return;
     }
@@ -352,6 +394,20 @@ export default function GameBoard({
         resetStates();
       });
       setIsSearchModalOpen(true);
+      return;
+    }
+
+    if (pendingUnderlayAce.suit === 'hearts' && abilityIdx === 0) {
+      const viable = getViableMindControlTargets(selectedEliteForUnderlay);
+      if (viable.length === 1) {
+        onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 0, { targetId: viable[0].id });
+        resetStates();
+      } else if (viable.length > 1) {
+        setTargetingMode('MIND_CONTROL');
+      } else {
+        onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 0);
+        resetStates();
+      }
       return;
     }
 
@@ -651,7 +707,7 @@ export default function GameBoard({
       </div>
 
       {/* Side status panels (Decks & Defeated) */}
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
+      <div className="sidebar-panel">
         <div className="deck-pile-indicators">
           <div className="deck-status-box">
             <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{language === 'bg' ? 'ТЕСТЕ' : 'DECK'} ({activePlayer === 'A' ? 'P1' : 'P2'})</div>
@@ -674,6 +730,9 @@ export default function GameBoard({
         }}>
           {language === 'bg' ? 'Щети от умора:' : 'Fatigue Draw count:'} {gameState.defeatedDrawsCount.A} (P1) / {gameState.defeatedDrawsCount.B} (P2)
         </div>
+
+        {/* Battle Feed Logs under fatigue draw count */}
+        <GameLogs logs={gameState.logs} language={language} isEmbedded={true} />
       </div>
 
       {/* Normal Card Power Choice Modal */}

@@ -80,9 +80,7 @@ export default function App() {
   const [onlineRole, setOnlineRole] = useState(null);
   const [onlineStatus, setOnlineStatus] = useState('idle'); // 'idle', 'connecting', 'connected', 'waiting', 'error'
   const [lobbyCodeInput, setLobbyCodeInput] = useState('');
-  const [serverUrl, setServerUrl] = useState(
-    window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://lit-elite-server.onrender.com'
-  );
+  const [serverUrl, setServerUrl] = useState('https://lit-elite-server.onrender.com');
   const [lobbyView, setLobbyView] = useState('menu'); // 'menu', 'create', 'join'
   const [isRoomPrivate, setIsRoomPrivate] = useState(true);
   const [publicRooms, setPublicRooms] = useState([]);
@@ -742,7 +740,6 @@ export default function App() {
   if (gameState.phase === 'DRAFT_NORMAL') {
     return (
       <div className="app-container">
-        {renderLanguageToggle(false)}
         <DraftPhase 
           gameState={stateForRender} 
           onSelectSubsection={handleSelectSubsection} 
@@ -756,7 +753,6 @@ export default function App() {
   if (gameState.phase === 'DRAFT_ELITE' || gameState.phase === 'DRAFT_ELITE_SELECT') {
     return (
       <div className="app-container">
-        {renderLanguageToggle(false)}
         <EliteDraftPhase 
           gameState={stateForRender} 
           onDraftElite={handleDraftElite}
@@ -772,7 +768,6 @@ export default function App() {
     const winnerName = gameState.winner === 'A' ? (gameState.mode === 'online' ? (TRANSLATIONS[language].onlineP1Name || 'Player 1 (A)') : 'Player A') : (gameState.mode === 'ai' ? 'Computer (AI)' : (gameState.mode === 'online' ? (TRANSLATIONS[language].onlineP2Name || 'Player 2 (B)') : 'Player B'));
     return (
       <div className="welcome-screen" style={{ gap: '20px' }}>
-        {renderLanguageToggle(false)}
         <h1 className="welcome-logo" style={{ animation: 'none', filter: 'drop-shadow(0 0 40px var(--color-clubs))' }}>
           {TRANSLATIONS[language].victory || 'VICTORY!'}
         </h1>
@@ -820,7 +815,6 @@ export default function App() {
   // 6. Active Gameplay scene
   return (
     <div className="app-container gameplay-layout">
-      {renderLanguageToggle(true)}
       <GameBoard 
         gameState={stateForRender}
         onPlayNormal={handlePlayNormal}
@@ -832,7 +826,6 @@ export default function App() {
         onlineRole={onlineRole}
         language={language}
       />
-      <GameLogs logs={gameState.logs} language={language} />
     </div>
   );
 }

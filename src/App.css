@@ -919,18 +919,44 @@
   }
 }
 
+.logs-embedded {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  overflow: hidden;
+  min-height: 200px;
+}
+
 @media (max-width: 900px) {
-  .app-container.gameplay-layout {
-    grid-template-columns: 1fr 240px; /* shrink log sidebar on medium screen */
+  .gameplay-arena {
+    grid-template-columns: 1fr 260px; /* shrink sidebar on medium screen */
   }
 }
 
-@media (max-width: 850px) {
-  .app-container.gameplay-layout {
-    grid-template-columns: 1fr; /* Hide side logs on narrow layouts to maximize board width */
+@media (max-width: 850px), (max-height: 550px) {
+  .app-container {
+    height: auto;
+    min-height: 100vh;
+    overflow: auto;
   }
+
+  .gameplay-arena {
+    height: auto;
+    min-height: 100vh;
+    grid-template-columns: 1fr; /* stack components vertically */
+  }
+
+  .battlefield {
+    height: auto;
+    min-height: 540px;
+  }
+
   .sidebar-panel {
-    display: none;
+    display: flex !important; /* ensure it is NOT hidden! */
+    height: auto;
+    min-height: 380px;
+    border-left: none;
+    border-top: 1px solid var(--border-light);
   }
 }
 
