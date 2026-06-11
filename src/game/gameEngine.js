@@ -1006,14 +1006,15 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
             logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Elite Clubs!`);
           }
         }
-        // Summon defeated Clubs from both players
+      } else if (abilityIdx === 1) {
+        // Summon defeated normal Clubs from both players
         const allDefeated = [
           ...pState.defeated.map(c => ({ card: c, ownerState: pState })),
           ...oppState.defeated.map(c => ({ card: c, ownerState: oppState }))
         ];
         
         const eligible = allDefeated
-          .filter(entry => entry.card.suit === 'clubs' && entry.card.value < dmg)
+          .filter(entry => entry.card.suit === 'clubs' && !entry.card.isElite && entry.card.value < dmg)
           .sort((a, b) => b.card.value - a.card.value);
         
         let summoned = 0;

@@ -81,8 +81,11 @@ export default function App() {
   const [onlineStatus, setOnlineStatus] = useState('idle'); // 'idle', 'connecting', 'connected', 'waiting', 'error'
   const [lobbyCodeInput, setLobbyCodeInput] = useState('');
   const [serverUrl, setServerUrl] = useState(
-    window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin
+    window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://lit-elite-server.onrender.com'
   );
+  const [lobbyView, setLobbyView] = useState('menu'); // 'menu', 'create', 'join'
+  const [isRoomPrivate, setIsRoomPrivate] = useState(true);
+  const [publicRooms, setPublicRooms] = useState([]);
 
   const socketRef = useRef(null);
   const roomCodeRef = useRef('');
@@ -117,12 +120,12 @@ export default function App() {
   }, [gameState?.logs?.length]);
 
   // Connect to room server and register events
-  const connectAndEmit = (url, actionCallback) => {
+  const connectToLobby = (url) => {
     if (socketRef.current) {
       socketRef.current.disconnect();
     }
     setOnlineStatus('connecting');
-    const targetUrl = url || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin);
+    const targetUrl = url || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://lit-elite-server.onrender.com');
     const newSocket = io(targetUrl, {
       transports: ['websocket'],
       timeout: 5000
@@ -132,8 +135,9 @@ export default function App() {
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
-      setOnlineStatus('connected');
-      actionCallback(newSocket);
+      setOnlineStatus('lobby');
+      setLobbyView('menu');
+      newSocket.emit('join_lobby');
     });
 
     newSocket.on('connect_error', () => {
@@ -143,9 +147,14 @@ export default function App() {
       socketRef.current = null;
     });
 
-    newSocket.on('room_created', ({ code }) => {
+    newSocket.on('public_rooms_list', (list) => {
+      setPublicRooms(list);
+    });
+
+    newSocket.on('room_created', ({ code, isPrivate }) => {
       roomCodeRef.current = code;
       setRoomCode(code);
+      setIsRoomPrivate(isPrivate);
       setOnlineRole('A');
       setOnlineStatus('waiting');
     });
@@ -173,10 +182,9 @@ export default function App() {
 
     newSocket.on('room_error', (msg) => {
       alert(msg);
-      setOnlineStatus('idle');
-      newSocket.disconnect();
-      setSocket(null);
-      socketRef.current = null;
+      setOnlineStatus('lobby');
+      setLobbyView('menu');
+      newSocket.emit('join_lobby');
     });
 
     newSocket.on('player_left', () => {
@@ -319,6 +327,7 @@ export default function App() {
   // Return to menu
   const handleResetToMenu = () => {
     if (socketRef.current) {
+      socketRef.current.emit('leave_lobby');
       socketRef.current.disconnect();
     }
     setSocket(null);
@@ -328,6 +337,15 @@ export default function App() {
     setOnlineStatus('idle');
     setGameState(null);
     setIsTurnHandoffActive(false);
+    setLobbyView('menu');
+    setPublicRooms([]);
+  };
+
+  const handleCancelWaiting = () => {
+    if (socketRef.current && roomCodeRef.current) {
+      socketRef.current.emit('leave_room', { code: roomCodeRef.current });
+    }
+    handleResetToMenu();
   };
 
   const handlePlayAgain = () => {
@@ -416,89 +434,240 @@ export default function App() {
             </div>
           </div>
         ) : onlineStatus !== 'idle' ? (
-          <div className="glass-panel mode-card" style={{ maxWidth: '500px', width: '100%', cursor: 'default' }}>
+          <div className="glass-panel mode-card" style={{ maxWidth: '520px', width: '100%', cursor: 'default' }}>
             {onlineStatus === 'lobby' ? (
               <>
                 <h3 style={{ marginBottom: '16px', color: 'var(--text-bright)' }}>{t.onlineMode}</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                  
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Server URL:</label>
-                    <input 
-                      type="text" 
-                      value={serverUrl} 
-                      onChange={(e) => setServerUrl(e.target.value)}
-                      className="lobby-input"
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                        color: 'var(--text-bright)',
-                        fontSize: '0.9rem'
-                      }}
-                    />
+                
+                {lobbyView === 'menu' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', textAlign: 'left' }}>
+                      <label style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>Server URL:</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input 
+                          type="text" 
+                          value={serverUrl} 
+                          onChange={(e) => setServerUrl(e.target.value)}
+                          className="lobby-input"
+                          style={{
+                            background: 'rgba(0, 0, 0, 0.3)',
+                            border: '1px solid rgba(255, 255, 255, 0.1)',
+                            borderRadius: '6px',
+                            padding: '6px 10px',
+                            color: 'var(--text-bright)',
+                            fontSize: '0.85rem',
+                            flex: 1
+                          }}
+                        />
+                        <button 
+                          className="btn-premium" 
+                          style={{ padding: '6px 12px', fontSize: '0.8rem' }}
+                          onClick={() => connectToLobby(serverUrl)}
+                        >
+                          Reconnect
+                        </button>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '16px', textAlign: 'left', minHeight: '220px' }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', borderRight: '1px solid rgba(255,255,255,0.08)', paddingRight: '12px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '0.9rem', fontWeight: '700', color: 'var(--text-bright)' }}>{t.publicRoomsTitle}</span>
+                          <button 
+                            className="btn-premium" 
+                            style={{ padding: '2px 8px', fontSize: '0.75rem', minWidth: 'auto', background: 'rgba(255,255,255,0.05)' }}
+                            onClick={() => socket?.emit('get_public_rooms')}
+                          >
+                            🔄 {t.refreshBtn}
+                          </button>
+                        </div>
+                        <div style={{ overflowY: 'auto', flex: 1, maxHeight: '200px', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                          {publicRooms.length === 0 ? (
+                            <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem', fontStyle: 'italic', padding: '20px 0', textAlign: 'center' }}>
+                              {t.noPublicRooms}
+                            </div>
+                          ) : (
+                            publicRooms.map((room) => (
+                              <div 
+                                key={room.code}
+                                className="choice-row-btn"
+                                onClick={() => socket?.emit('join_room', { code: room.code })}
+                                style={{
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  padding: '8px 12px',
+                                  background: 'rgba(255, 255, 255, 0.03)',
+                                  border: '1px solid rgba(255, 255, 255, 0.05)',
+                                  borderRadius: '6px',
+                                  cursor: 'pointer',
+                                  transition: 'background 0.2s'
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.08)'}
+                                onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.03)'}
+                              >
+                                <div>
+                                  <span style={{ fontWeight: '700', color: 'var(--color-clubs)' }}>#{room.code}</span>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{t.clickToJoin}</div>
+                                </div>
+                                <span style={{ fontSize: '0.8rem', background: 'rgba(16, 185, 129, 0.2)', color: 'var(--color-clubs)', padding: '2px 6px', borderRadius: '4px' }}>
+                                  {room.playersCount}/2 Players
+                                </span>
+                              </div>
+                            ))
+                          )}
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', justifyContent: 'center' }}>
+                        <button 
+                          className="btn-premium btn-clubs" 
+                          style={{ justifyContent: 'center' }}
+                          onClick={() => setLobbyView('create')}
+                        >
+                          {t.createLobby}
+                        </button>
+                        <button 
+                          className="btn-premium btn-diamonds" 
+                          style={{ justifyContent: 'center' }}
+                          onClick={() => setLobbyView('join')}
+                        >
+                          {t.joinLobby}
+                        </button>
+                        <button 
+                          className="btn-premium" 
+                          style={{ justifyContent: 'center' }}
+                          onClick={handleResetToMenu}
+                        >
+                          {t.back}
+                        </button>
+                      </div>
+                    </div>
                   </div>
+                ) : lobbyView === 'create' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                    <h4 style={{ color: 'var(--text-bright)', fontSize: '1rem', textAlign: 'left' }}>{t.createLobby}</h4>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', textAlign: 'left' }}>
+                      <label style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t.roomTypeLabel}</label>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                        <label 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '10px', 
+                            padding: '10px', 
+                            background: !isRoomPrivate ? 'rgba(16, 185, 129, 0.08)' : 'rgba(0,0,0,0.2)', 
+                            border: !isRoomPrivate ? '1px solid var(--color-clubs)' : '1px solid rgba(255,255,255,0.05)',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <input 
+                            type="radio" 
+                            name="roomType" 
+                            checked={!isRoomPrivate} 
+                            onChange={() => setIsRoomPrivate(false)} 
+                          />
+                          <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>{t.publicRoom}</span>
+                        </label>
 
-                  <button 
-                    className="btn-premium btn-clubs" 
-                    style={{ justifyContent: 'center' }}
-                    onClick={() => {
-                      connectAndEmit(serverUrl, (s) => {
-                        s.emit('create_room', { mode: 'online' });
-                      });
-                    }}
-                  >
-                    {t.createLobby}
-                  </button>
+                        <label 
+                          style={{ 
+                            display: 'flex', 
+                            alignItems: 'center', 
+                            gap: '10px', 
+                            padding: '10px', 
+                            background: isRoomPrivate ? 'rgba(99, 102, 241, 0.08)' : 'rgba(0,0,0,0.2)', 
+                            border: isRoomPrivate ? '1px solid var(--color-spades)' : '1px solid rgba(255,255,255,0.05)',
+                            borderRadius: '6px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <input 
+                            type="radio" 
+                            name="roomType" 
+                            checked={isRoomPrivate} 
+                            onChange={() => setIsRoomPrivate(true)} 
+                          />
+                          <span style={{ fontWeight: '700', fontSize: '0.85rem' }}>{t.privateRoom}</span>
+                        </label>
+                      </div>
+                    </div>
 
-                  <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', margin: '8px 0' }} />
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
-                    <label style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t.lobbyCodeLabel}</label>
-                    <input 
-                      type="text" 
-                      maxLength={4}
-                      placeholder="e.g. 1234"
-                      value={lobbyCodeInput} 
-                      onChange={(e) => setLobbyCodeInput(e.target.value.replace(/\D/g, ''))}
-                      className="lobby-input"
-                      style={{
-                        background: 'rgba(0, 0, 0, 0.3)',
-                        border: '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '6px',
-                        padding: '8px 12px',
-                        color: 'var(--text-bright)',
-                        fontSize: '1.2rem',
-                        letterSpacing: '4px',
-                        textAlign: 'center',
-                        fontWeight: '700'
-                      }}
-                    />
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                      <button 
+                        className="btn-premium btn-clubs" 
+                        style={{ flex: 1, justifyContent: 'center' }}
+                        onClick={() => {
+                          socket?.emit('create_room', { mode: 'online', isPrivate: isRoomPrivate });
+                        }}
+                      >
+                        {t.createBtn}
+                      </button>
+                      <button 
+                        className="btn-premium" 
+                        style={{ flex: 1, justifyContent: 'center' }}
+                        onClick={() => {
+                          setLobbyView('menu');
+                          socket?.emit('join_lobby');
+                        }}
+                      >
+                        {t.back}
+                      </button>
+                    </div>
                   </div>
+                ) : lobbyView === 'join' ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', width: '100%' }}>
+                    <h4 style={{ color: 'var(--text-bright)', fontSize: '1rem', textAlign: 'left' }}>{t.joinPrivateTitle}</h4>
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                      <label style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t.lobbyCodeLabel}</label>
+                      <input 
+                        type="text" 
+                        maxLength={4}
+                        placeholder="e.g. 1234"
+                        value={lobbyCodeInput} 
+                        onChange={(e) => setLobbyCodeInput(e.target.value.replace(/\D/g, ''))}
+                        className="lobby-input"
+                        style={{
+                          background: 'rgba(0, 0, 0, 0.3)',
+                          border: '1px solid rgba(255, 255, 255, 0.1)',
+                          borderRadius: '6px',
+                          padding: '8px 12px',
+                          color: 'var(--text-bright)',
+                          fontSize: '1.5rem',
+                          letterSpacing: '6px',
+                          textAlign: 'center',
+                          fontWeight: '700'
+                        }}
+                      />
+                    </div>
 
-                  <button 
-                    className="btn-premium btn-diamonds" 
-                    style={{ justifyContent: 'center' }}
-                    disabled={lobbyCodeInput.length !== 4}
-                    onClick={() => {
-                      connectAndEmit(serverUrl, (s) => {
-                        s.emit('join_room', { code: lobbyCodeInput });
-                      });
-                    }}
-                  >
-                    {t.joinBtn}
-                  </button>
-
-                  <button 
-                    className="btn-premium" 
-                    style={{ marginTop: '8px', justifyContent: 'center' }} 
-                    onClick={() => setOnlineStatus('idle')}
-                  >
-                    {t.back}
-                  </button>
-
-                </div>
+                    <div style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
+                      <button 
+                        className="btn-premium btn-diamonds" 
+                        style={{ flex: 1, justifyContent: 'center' }}
+                        disabled={lobbyCodeInput.length !== 4}
+                        onClick={() => {
+                          socket?.emit('join_room', { code: lobbyCodeInput });
+                        }}
+                      >
+                        {t.joinBtn}
+                      </button>
+                      <button 
+                        className="btn-premium" 
+                        style={{ flex: 1, justifyContent: 'center' }}
+                        onClick={() => {
+                          setLobbyView('menu');
+                          socket?.emit('join_lobby');
+                        }}
+                      >
+                        {t.back}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
               </>
             ) : onlineStatus === 'connecting' ? (
               <div style={{ textAlign: 'center', padding: '20px 0' }}>
@@ -506,16 +675,27 @@ export default function App() {
                 <p style={{ color: 'var(--text-bright)' }}>{t.connecting}</p>
               </div>
             ) : onlineStatus === 'waiting' ? (
-              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+              <div style={{ textAlign: 'center', padding: '10px 0', width: '100%' }}>
                 <h3 style={{ color: 'var(--color-clubs)', marginBottom: '8px' }}>{t.lobbyCreated}</h3>
-                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '16px' }}>{t.shareCode}</p>
-                <div style={{ fontSize: '3rem', fontWeight: '800', letterSpacing: '6px', color: 'var(--text-bright)', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', margin: '16px 0', textShadow: '0 0 20px rgba(255,255,255,0.1)' }}>
-                  {roomCode}
-                </div>
+                
+                {isRoomPrivate ? (
+                  <>
+                    <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '16px' }}>{t.shareCode}</p>
+                    <div style={{ fontSize: '3rem', fontWeight: '800', letterSpacing: '6px', color: 'var(--text-bright)', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', margin: '16px 0', textShadow: '0 0 20px rgba(255,255,255,0.1)' }}>
+                      {roomCode}
+                    </div>
+                  </>
+                ) : (
+                  <div style={{ padding: '20px 12px', background: 'rgba(16, 185, 129, 0.05)', border: '1px solid rgba(16, 185, 129, 0.2)', borderRadius: '8px', margin: '20px 0' }}>
+                    <p style={{ color: 'var(--text-bright)', fontWeight: '600', fontSize: '0.9rem' }}>{t.waitingPublicDesc}</p>
+                    <p style={{ color: 'var(--text-dim)', fontSize: '0.75rem', marginTop: '8px' }}>Room Code: #{roomCode}</p>
+                  </div>
+                )}
+                
                 <p style={{ color: 'var(--color-diamonds)', fontSize: '0.95rem', animation: 'pulse 1.5s infinite', margin: '20px 0' }}>
                   {t.waitingForOpponentConnect}
                 </p>
-                <button className="btn-premium" style={{ width: '100%', justifyContent: 'center' }} onClick={handleResetToMenu}>
+                <button className="btn-premium" style={{ width: '100%', justifyContent: 'center' }} onClick={handleCancelWaiting}>
                   {t.back}
                 </button>
               </div>
@@ -524,7 +704,7 @@ export default function App() {
                 <h3 style={{ color: 'var(--color-hearts)', marginBottom: '12px' }}>{t.serverError}</h3>
                 <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem', marginBottom: '24px' }}>{t.connectFailed}</p>
                 <div style={{ display: 'flex', gap: '12px' }}>
-                  <button className="btn-premium btn-diamonds" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setOnlineStatus('lobby')}>
+                  <button className="btn-premium btn-diamonds" style={{ flex: 1, justifyContent: 'center' }} onClick={() => connectToLobby(serverUrl)}>
                     Retry
                   </button>
                   <button className="btn-premium" style={{ flex: 1, justifyContent: 'center' }} onClick={handleResetToMenu}>
@@ -544,7 +724,7 @@ export default function App() {
               <h3>{t.aiMode}</h3>
               <p>{t.aiDesc}</p>
             </div>
-            <div className="glass-panel mode-card" onClick={() => setOnlineStatus('lobby')}>
+            <div className="glass-panel mode-card" onClick={() => connectToLobby(serverUrl)}>
               <h3>{t.onlineMode}</h3>
               <p>{t.onlineDesc}</p>
             </div>
@@ -639,7 +819,7 @@ export default function App() {
 
   // 6. Active Gameplay scene
   return (
-    <div className="app-container" style={{ display: 'grid', gridTemplateColumns: '1fr 340px' }}>
+    <div className="app-container gameplay-layout">
       {renderLanguageToggle(true)}
       <GameBoard 
         gameState={stateForRender}

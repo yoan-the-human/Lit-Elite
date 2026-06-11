@@ -14,7 +14,7 @@ export const TRANSLATIONS = {
     aiDraftsFirst: 'AI Drafts First (Player B)',
     coinFlip: 'Coin Flip (Let Chance Decide)',
     back: '← Back',
-    version: 'Version 0.3.0 (Online Mode) • Alpha',
+    version: 'Version 1.0.1 (Online Mode) • Alpha',
     
     // Online Lobby
     createLobby: 'Create Online Room',
@@ -32,6 +32,16 @@ export const TRANSLATIONS = {
     serverError: 'Server Error',
     onlineP1Name: 'Player 1 (A)',
     onlineP2Name: 'Player 2 (B)',
+    roomTypeLabel: 'Room Type:',
+    publicRoom: 'Public (Listed on server)',
+    privateRoom: 'Private (Code required)',
+    publicRoomsTitle: 'Available Public Rooms',
+    noPublicRooms: 'No public rooms available. Create one!',
+    refreshBtn: 'Refresh Rooms',
+    createBtn: 'Create Room Now',
+    joinPrivateTitle: 'Join Private Room by Code',
+    waitingPublicDesc: 'Your public room is active. Waiting for anyone to join...',
+    clickToJoin: 'Click to Join Room',
     
     // Draft Phase
     draftNormalTitle: 'Draft Phase - Normal Cards',
@@ -120,7 +130,7 @@ export const TRANSLATIONS = {
     aiDraftsFirst: 'AI избира първи (Играч B)',
     coinFlip: 'Ези или тура (Нека шансът реши)',
     back: '← Назад',
-    version: 'Версия 0.3.0 (Онлайн режим) • Алфа',
+    version: 'Версия 1.0.1 (Онлайн режим) • Алфа',
     
     // Online Lobby
     createLobby: 'Създай онлайн стая',
@@ -138,6 +148,16 @@ export const TRANSLATIONS = {
     serverError: 'Сървърна грешка',
     onlineP1Name: 'Играч 1 (А)',
     onlineP2Name: 'Играч 2 (Б)',
+    roomTypeLabel: 'Тип стая:',
+    publicRoom: 'Публична (Вижда се от всички)',
+    privateRoom: 'Частна (Влизане с код)',
+    publicRoomsTitle: 'Налични публични стаи',
+    noPublicRooms: 'В момента няма публични стаи. Създайте една!',
+    refreshBtn: 'Обнови списъка',
+    createBtn: 'Създай стаята сега',
+    joinPrivateTitle: 'Влез в частна стая с код',
+    waitingPublicDesc: 'Вашата стая е в списъка. Изчакване на играч за влизане...',
+    clickToJoin: 'Кликнете за влизане в стаята',
     
     // Draft Phase
     draftNormalTitle: 'Фаза на избор - Нормални карти',

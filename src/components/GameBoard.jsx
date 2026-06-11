@@ -156,10 +156,10 @@ export default function GameBoard({
       const count = rank === 'J' ? 2 : rank === 'Q' ? 3 : 4;
       return isBg ? [
         `Детонация: Нанесете ${dmg} щети на всички вражески карти на борда`,
-        `Призоваване: Възкресете ${count} победени нормални карти Спатия (< ${dmg} атака)`
+        `Призоваване: Възкресете ${count} победени нормални карти Спатия`
       ] : [
         `Detonation: Deal ${dmg} damage to all enemy board cards`,
-        `Summon: Resurrect ${count} defeated normal Clubs cards (< ${dmg} ATK)`
+        `Summon: Resurrect ${count} defeated normal Clubs cards`
       ];
     }
     return [];
@@ -654,12 +654,12 @@ export default function GameBoard({
       <div style={{ display: 'flex', flexDirection: 'column' }}>
         <div className="deck-pile-indicators">
           <div className="deck-status-box">
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{language === 'bg' ? 'ТЕСТЕ' : 'DECK'}</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{pA.deck.length}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{language === 'bg' ? 'ТЕСТЕ' : 'DECK'} ({activePlayer === 'A' ? 'P1' : 'P2'})</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{activePlayer === 'A' ? pA.deck.length : pB.deck.length}</div>
           </div>
           <div className="deck-status-box" style={{ borderLeftColor: 'var(--color-hearts)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{language === 'bg' ? 'ПОБЕДЕНИ' : 'DEFEATED'}</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-hearts)' }}>{pA.defeated.length}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{language === 'bg' ? 'ПОБЕДЕНИ' : 'DEFEATED'} ({activePlayer === 'A' ? 'P1' : 'P2'})</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-hearts)' }}>{activePlayer === 'A' ? pA.defeated.length : pB.defeated.length}</div>
           </div>
         </div>
 
