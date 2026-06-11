@@ -1,6 +1,7 @@
 import React from 'react';
 
-export default function TurnOverlay({ activePlayerName, onConfirmReady }) {
+export default function TurnOverlay({ activePlayerName, onConfirmReady, language = 'en' }) {
+  const isBg = language === 'bg';
   return (
     <div className="turn-handoff-screen">
       <div style={{
@@ -33,10 +34,10 @@ export default function TurnOverlay({ activePlayerName, onConfirmReady }) {
         
         <div>
           <h2 style={{ fontSize: '2rem', fontWeight: '800', marginBottom: '8px' }}>
-            Pass the Device
+            {isBg ? 'Предайте устройството' : 'Pass the Device'}
           </h2>
           <p style={{ color: 'var(--text-dim)', fontSize: '1rem', lineHeight: '1.6' }}>
-            Please hand the controls over to:
+            {isBg ? 'Моля, предайте контрола на:' : 'Please hand the controls over to:'}
           </p>
           <h3 style={{ 
             fontSize: '1.75rem', 
@@ -50,7 +51,7 @@ export default function TurnOverlay({ activePlayerName, onConfirmReady }) {
         </div>
 
         <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-          Opponent should look away from the screen before clicking the button below to reveal the hand.
+          {isBg ? 'Опонентът трябва да гледа настрани от екрана, преди да се натисне бутонът за разкриване на ръката.' : 'Opponent should look away from the screen before clicking the button below to reveal the hand.'}
         </p>
 
         <button 
@@ -58,7 +59,7 @@ export default function TurnOverlay({ activePlayerName, onConfirmReady }) {
           onClick={onConfirmReady}
           style={{ fontSize: '1.1rem', padding: '12px 32px', width: '100%' }}
         >
-          I Am Ready!
+          {isBg ? 'Готов съм!' : 'I Am Ready!'}
         </button>
       </div>
     </div>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './App.css';
 import { getInitialGameState, draftNormalSubsection, draftEliteCard, selectFinalElites, playNormalCard, playEliteCard, playUnderlayAce, executeCombat, executeAttackPlayer, endTurn } from './game/gameEngine';
 import { runAiGameplayTurn, getAiNormalDraftChoice, getAiEliteDraftChoice } from './game/aiOpponent';
@@ -7,6 +7,8 @@ import EliteDraftPhase from './components/EliteDraftPhase';
 import GameBoard from './components/GameBoard';
 import GameLogs from './components/GameLogs';
 import TurnOverlay from './components/TurnOverlay';
+import { io } from 'socket.io-client';
+import { TRANSLATIONS } from './game/translations';
 
 // Synthetic sound player
 function playSound(type) {
@@ -72,6 +74,29 @@ export default function App() {
   const [gameState, setGameState] = useState(null);
   const [isTurnHandoffActive, setIsTurnHandoffActive] = useState(false);
   const [showAiFirstChoice, setShowAiFirstChoice] = useState(false);
+  const [language, setLanguage] = useState('en');
+  const [socket, setSocket] = useState(null);
+  const [roomCode, setRoomCode] = useState('');
+  const [onlineRole, setOnlineRole] = useState(null);
+  const [onlineStatus, setOnlineStatus] = useState('idle'); // 'idle', 'connecting', 'connected', 'waiting', 'error'
+  const [lobbyCodeInput, setLobbyCodeInput] = useState('');
+  const [serverUrl, setServerUrl] = useState(
+    window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin
+  );
+
+  const socketRef = useRef(null);
+  const roomCodeRef = useRef('');
+  socketRef.current = socket;
+  roomCodeRef.current = roomCode;
+
+  // Cleanup socket on unmount
+  useEffect(() => {
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+      }
+    };
+  }, []);
 
   // Trigger sound when card counts change (for draws) or logs update
   useEffect(() => {
@@ -91,8 +116,96 @@ export default function App() {
     }
   }, [gameState?.logs?.length]);
 
+  // Connect to room server and register events
+  const connectAndEmit = (url, actionCallback) => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+    setOnlineStatus('connecting');
+    const targetUrl = url || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : window.location.origin);
+    const newSocket = io(targetUrl, {
+      transports: ['websocket'],
+      timeout: 5000
+    });
+
+    socketRef.current = newSocket;
+    setSocket(newSocket);
+
+    newSocket.on('connect', () => {
+      setOnlineStatus('connected');
+      actionCallback(newSocket);
+    });
+
+    newSocket.on('connect_error', () => {
+      setOnlineStatus('error');
+      newSocket.disconnect();
+      setSocket(null);
+      socketRef.current = null;
+    });
+
+    newSocket.on('room_created', ({ code }) => {
+      roomCodeRef.current = code;
+      setRoomCode(code);
+      setOnlineRole('A');
+      setOnlineStatus('waiting');
+    });
+
+    newSocket.on('room_joined', ({ code, role }) => {
+      roomCodeRef.current = code;
+      setRoomCode(code);
+      setOnlineRole(role);
+      setOnlineStatus('connected');
+    });
+
+    newSocket.on('player_joined', ({ role }) => {
+      setOnlineStatus('connected');
+      const startingPlayer = Math.random() < 0.5 ? 'A' : 'B';
+      const initialMsg = `Coin flipped: ${startingPlayer === 'A' ? 'Player 1 (A)' : 'Player 2 (B)'} goes first!`;
+      const state = getInitialGameState('online', startingPlayer);
+      state.logs.push(initialMsg);
+      setGameState(state);
+      newSocket.emit('update_state', { code: roomCodeRef.current, state });
+    });
+
+    newSocket.on('state_updated', (newState) => {
+      setGameState(newState);
+    });
+
+    newSocket.on('room_error', (msg) => {
+      alert(msg);
+      setOnlineStatus('idle');
+      newSocket.disconnect();
+      setSocket(null);
+      socketRef.current = null;
+    });
+
+    newSocket.on('player_left', () => {
+      alert('Opponent disconnected! The game lobby has been closed.');
+      handleResetToMenu();
+    });
+  };
+
+  const updateAndSyncState = (updaterFn) => {
+    setGameState(prev => {
+      const next = updaterFn(prev);
+      if (socketRef.current && roomCodeRef.current) {
+        socketRef.current.emit('update_state', { code: roomCodeRef.current, state: next });
+      }
+      return next;
+    });
+  };
+
   // Start game action
   const handleStartGame = (mode, forcedStartingPlayer = null) => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      setSocket(null);
+      socketRef.current = null;
+    }
+    setRoomCode('');
+    setOnlineRole(null);
+    setOnlineStatus('idle');
+
     let startingPlayer = forcedStartingPlayer;
     let methodMsg = "";
     if (mode === 'ai') {
@@ -115,64 +228,40 @@ export default function App() {
 
   // Draft Phase Actions
   const handleSelectSubsection = (subId) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return draftNormalSubsection(next, subId);
-    });
+    updateAndSyncState(prev => draftNormalSubsection(structuredClone(prev), subId));
   };
 
   const handleDraftElite = (cardId) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return draftEliteCard(next, cardId);
-    });
+    updateAndSyncState(prev => draftEliteCard(structuredClone(prev), cardId));
   };
 
   const handleSelectFinalElites = (player, cardIds) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return selectFinalElites(next, player, cardIds);
-    });
+    updateAndSyncState(prev => selectFinalElites(structuredClone(prev), player, cardIds));
   };
 
   // Gameplay actions
   const handlePlayNormal = (cardId, powerIdx, targetInfo) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return playNormalCard(next, cardId, powerIdx, targetInfo);
-    });
+    updateAndSyncState(prev => playNormalCard(structuredClone(prev), cardId, powerIdx, targetInfo));
   };
 
   const handlePlayElite = (cardId, abilityIdx, extraParams) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return playEliteCard(next, cardId, abilityIdx, extraParams);
-    });
+    updateAndSyncState(prev => playEliteCard(structuredClone(prev), cardId, abilityIdx, extraParams));
   };
 
   const handlePlayUnderlay = (aceId, targetEliteId, abilityIdx, extraParams) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return playUnderlayAce(next, aceId, targetEliteId, abilityIdx, extraParams);
-    });
+    updateAndSyncState(prev => playUnderlayAce(structuredClone(prev), aceId, targetEliteId, abilityIdx, extraParams));
   };
 
   const handleCombat = (attackerId, defenderId) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return executeCombat(next, attackerId, defenderId);
-    });
+    updateAndSyncState(prev => executeCombat(structuredClone(prev), attackerId, defenderId));
   };
 
   const handleAttackPlayer = (attackerId) => {
-    setGameState(prev => {
-      const next = structuredClone(prev);
-      return executeAttackPlayer(next, attackerId);
-    });
+    updateAndSyncState(prev => executeAttackPlayer(structuredClone(prev), attackerId));
   };
 
   const handleEndTurn = () => {
-    setGameState(prev => {
+    updateAndSyncState(prev => {
       const next = structuredClone(prev);
       const updated = endTurn(next);
       
@@ -229,52 +318,241 @@ export default function App() {
 
   // Return to menu
   const handleResetToMenu = () => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+    }
+    setSocket(null);
+    socketRef.current = null;
+    setRoomCode('');
+    setOnlineRole(null);
+    setOnlineStatus('idle');
     setGameState(null);
     setIsTurnHandoffActive(false);
   };
 
+  const handlePlayAgain = () => {
+    if (gameState.mode === 'online') {
+      if (onlineRole === 'A') {
+        const startingPlayer = Math.random() < 0.5 ? 'A' : 'B';
+        const initialMsg = `Game Restarted! Coin flipped: ${startingPlayer === 'A' ? 'Player 1 (A)' : 'Player 2 (B)'} goes first!`;
+        const state = getInitialGameState('online', startingPlayer);
+        state.logs.push(initialMsg);
+        setGameState(state);
+        if (socketRef.current && roomCodeRef.current) {
+          socketRef.current.emit('update_state', { code: roomCodeRef.current, state });
+        }
+      } else {
+        alert('Waiting for Player 1 (A) to restart the game...');
+      }
+    } else {
+      handleStartGame(gameState.mode);
+    }
+  };
+
+  const toggleLanguage = () => {
+    setLanguage(prev => prev === 'en' ? 'bg' : 'en');
+  };
+
+  const renderLanguageToggle = (inGame = false) => (
+    <button 
+      onClick={toggleLanguage} 
+      className="btn-premium" 
+      style={inGame ? { 
+        position: 'absolute', 
+        top: '12px', 
+        right: '360px', 
+        zIndex: 1000, 
+        padding: '6px 12px', 
+        fontSize: '0.8rem',
+        minWidth: 'auto',
+        background: 'rgba(255, 255, 255, 0.07)',
+        border: '1px solid rgba(255, 255, 255, 0.12)',
+        borderRadius: '6px'
+      } : { 
+        position: 'absolute', 
+        top: '20px', 
+        right: '20px', 
+        zIndex: 1000, 
+        padding: '8px 16px', 
+        fontSize: '0.85rem',
+        minWidth: 'auto',
+        background: 'rgba(255, 255, 255, 0.05)',
+        border: '1px solid rgba(255, 255, 255, 0.1)'
+      }}
+    >
+      {language === 'en' ? '🇧🇬 BG' : '🇺🇸 EN'}
+    </button>
+  );
+
+  const stateForRender = gameState ? { ...gameState, onlineRole } : null;
+
   // 1. Welcome scene
   if (!gameState) {
+    const t = TRANSLATIONS[language] || TRANSLATIONS.en;
     return (
       <div className="welcome-screen">
-        <h1 className="welcome-logo">Lit Elite</h1>
+        {renderLanguageToggle(false)}
+        <h1 className="welcome-logo">{t.title}</h1>
         <p className="welcome-subtitle">
-          New era of normal card gameplay. Assemble your deck and crush your opponent. Be victorious. Become a legend.
+          {t.subtitle}
         </p>
         
         {showAiFirstChoice ? (
           <div className="glass-panel mode-card" style={{ maxWidth: '500px', width: '100%', cursor: 'default' }}>
-            <h3 style={{ marginBottom: '16px', color: 'var(--text-bright)' }}>Who drafts first, comrade?</h3>
+            <h3 style={{ marginBottom: '16px', color: 'var(--text-bright)' }}>{t.whoDraftsFirst}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button className="btn-premium btn-spades" style={{ justifyContent: 'center' }} onClick={() => handleStartGame('ai', 'A')}>
-                I Draft First (Player A)
+                {t.iDraftFirst}
               </button>
               <button className="btn-premium btn-hearts" style={{ justifyContent: 'center' }} onClick={() => handleStartGame('ai', 'B')}>
-                AI Drafts First (Player B)
+                {t.aiDraftsFirst}
               </button>
               <button className="btn-premium btn-diamonds" style={{ justifyContent: 'center' }} onClick={() => handleStartGame('ai', null)}>
-                Coin Flip (Let Chance Decide)
+                {t.coinFlip}
               </button>
               <button className="btn-premium btn-clubs" style={{ marginTop: '8px', justifyContent: 'center' }} onClick={() => setShowAiFirstChoice(false)}>
-                ← Back
+                {t.back}
               </button>
             </div>
+          </div>
+        ) : onlineStatus !== 'idle' ? (
+          <div className="glass-panel mode-card" style={{ maxWidth: '500px', width: '100%', cursor: 'default' }}>
+            {onlineStatus === 'lobby' ? (
+              <>
+                <h3 style={{ marginBottom: '16px', color: 'var(--text-bright)' }}>{t.onlineMode}</h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>Server URL:</label>
+                    <input 
+                      type="text" 
+                      value={serverUrl} 
+                      onChange={(e) => setServerUrl(e.target.value)}
+                      className="lobby-input"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        color: 'var(--text-bright)',
+                        fontSize: '0.9rem'
+                      }}
+                    />
+                  </div>
+
+                  <button 
+                    className="btn-premium btn-clubs" 
+                    style={{ justifyContent: 'center' }}
+                    onClick={() => {
+                      connectAndEmit(serverUrl, (s) => {
+                        s.emit('create_room', { mode: 'online' });
+                      });
+                    }}
+                  >
+                    {t.createLobby}
+                  </button>
+
+                  <div style={{ borderBottom: '1px solid rgba(255, 255, 255, 0.08)', margin: '8px 0' }} />
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                    <label style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>{t.lobbyCodeLabel}</label>
+                    <input 
+                      type="text" 
+                      maxLength={4}
+                      placeholder="e.g. 1234"
+                      value={lobbyCodeInput} 
+                      onChange={(e) => setLobbyCodeInput(e.target.value.replace(/\D/g, ''))}
+                      className="lobby-input"
+                      style={{
+                        background: 'rgba(0, 0, 0, 0.3)',
+                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '6px',
+                        padding: '8px 12px',
+                        color: 'var(--text-bright)',
+                        fontSize: '1.2rem',
+                        letterSpacing: '4px',
+                        textAlign: 'center',
+                        fontWeight: '700'
+                      }}
+                    />
+                  </div>
+
+                  <button 
+                    className="btn-premium btn-diamonds" 
+                    style={{ justifyContent: 'center' }}
+                    disabled={lobbyCodeInput.length !== 4}
+                    onClick={() => {
+                      connectAndEmit(serverUrl, (s) => {
+                        s.emit('join_room', { code: lobbyCodeInput });
+                      });
+                    }}
+                  >
+                    {t.joinBtn}
+                  </button>
+
+                  <button 
+                    className="btn-premium" 
+                    style={{ marginTop: '8px', justifyContent: 'center' }} 
+                    onClick={() => setOnlineStatus('idle')}
+                  >
+                    {t.back}
+                  </button>
+
+                </div>
+              </>
+            ) : onlineStatus === 'connecting' ? (
+              <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                <div className="spinner" style={{ margin: '0 auto 16px auto', border: '3px solid rgba(255,255,255,0.1)', borderTop: '3px solid var(--color-diamonds)', borderRadius: '50%', width: '40px', height: '40px', animation: 'spin 1s linear infinite' }} />
+                <p style={{ color: 'var(--text-bright)' }}>{t.connecting}</p>
+              </div>
+            ) : onlineStatus === 'waiting' ? (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <h3 style={{ color: 'var(--color-clubs)', marginBottom: '8px' }}>{t.lobbyCreated}</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.9rem', marginBottom: '16px' }}>{t.shareCode}</p>
+                <div style={{ fontSize: '3rem', fontWeight: '800', letterSpacing: '6px', color: 'var(--text-bright)', background: 'rgba(0,0,0,0.2)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)', margin: '16px 0', textShadow: '0 0 20px rgba(255,255,255,0.1)' }}>
+                  {roomCode}
+                </div>
+                <p style={{ color: 'var(--color-diamonds)', fontSize: '0.95rem', animation: 'pulse 1.5s infinite', margin: '20px 0' }}>
+                  {t.waitingForOpponentConnect}
+                </p>
+                <button className="btn-premium" style={{ width: '100%', justifyContent: 'center' }} onClick={handleResetToMenu}>
+                  {t.back}
+                </button>
+              </div>
+            ) : onlineStatus === 'error' ? (
+              <div style={{ textAlign: 'center', padding: '10px 0' }}>
+                <h3 style={{ color: 'var(--color-hearts)', marginBottom: '12px' }}>{t.serverError}</h3>
+                <p style={{ color: 'var(--text-dim)', fontSize: '0.95rem', marginBottom: '24px' }}>{t.connectFailed}</p>
+                <div style={{ display: 'flex', gap: '12px' }}>
+                  <button className="btn-premium btn-diamonds" style={{ flex: 1, justifyContent: 'center' }} onClick={() => setOnlineStatus('lobby')}>
+                    Retry
+                  </button>
+                  <button className="btn-premium" style={{ flex: 1, justifyContent: 'center' }} onClick={handleResetToMenu}>
+                    {t.back}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         ) : (
           <div className="mode-choices">
             <div className="glass-panel mode-card" onClick={() => handleStartGame('hotseat')}>
-              <h3>Pass & Play (Hotseat)</h3>
-              <p>1v1 battle on the same computer. Full screen blockers hide hands between turns.</p>
+              <h3>{t.hotseatMode}</h3>
+              <p>{t.hotseatDesc}</p>
             </div>
             <div className="glass-panel mode-card" onClick={() => setShowAiFirstChoice(true)}>
-              <h3>Vs Computer (AI)</h3>
-              <p>Play against the custom automated AI player. Perfect for testing and practicing.</p>
+              <h3>{t.aiMode}</h3>
+              <p>{t.aiDesc}</p>
+            </div>
+            <div className="glass-panel mode-card" onClick={() => setOnlineStatus('lobby')}>
+              <h3>{t.onlineMode}</h3>
+              <p>{t.onlineDesc}</p>
             </div>
           </div>
         )}
         
         <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
-          Version 0.2.5 (Offline Mode) • Alpha
+          {t.version}
         </div>
       </div>
     );
@@ -284,9 +562,11 @@ export default function App() {
   if (gameState.phase === 'DRAFT_NORMAL') {
     return (
       <div className="app-container">
+        {renderLanguageToggle(false)}
         <DraftPhase 
-          gameState={gameState} 
+          gameState={stateForRender} 
           onSelectSubsection={handleSelectSubsection} 
+          language={language}
         />
       </div>
     );
@@ -296,10 +576,12 @@ export default function App() {
   if (gameState.phase === 'DRAFT_ELITE' || gameState.phase === 'DRAFT_ELITE_SELECT') {
     return (
       <div className="app-container">
+        {renderLanguageToggle(false)}
         <EliteDraftPhase 
-          gameState={gameState} 
+          gameState={stateForRender} 
           onDraftElite={handleDraftElite}
           onSelectFinalElites={handleSelectFinalElites}
+          language={language}
         />
       </div>
     );
@@ -307,29 +589,36 @@ export default function App() {
 
   // 4. Game Over screen
   if (gameState.phase === 'GAME_OVER' || gameState.winner) {
-    const winnerName = gameState.winner === 'A' ? 'Player A' : (gameState.mode === 'ai' ? 'Computer (AI)' : 'Player B');
+    const winnerName = gameState.winner === 'A' ? (gameState.mode === 'online' ? (TRANSLATIONS[language].onlineP1Name || 'Player 1 (A)') : 'Player A') : (gameState.mode === 'ai' ? 'Computer (AI)' : (gameState.mode === 'online' ? (TRANSLATIONS[language].onlineP2Name || 'Player 2 (B)') : 'Player B'));
     return (
       <div className="welcome-screen" style={{ gap: '20px' }}>
+        {renderLanguageToggle(false)}
         <h1 className="welcome-logo" style={{ animation: 'none', filter: 'drop-shadow(0 0 40px var(--color-clubs))' }}>
-          VICTORY!
+          {TRANSLATIONS[language].victory || 'VICTORY!'}
         </h1>
         <h2 style={{ fontSize: '2.5rem', fontWeight: '800' }}>
-          {winnerName} is Victorious!
+          {winnerName} {TRANSLATIONS[language].isVictorious || 'is Victorious!'}
         </h2>
         <p style={{ color: 'var(--text-dim)', fontSize: '1.1rem', maxWidth: '600px', textAlign: 'center' }}>
-          The battle has ended. One player stands strong in the snow, the other has fallen into fatigue and ashes!
+          {TRANSLATIONS[language].gameOverDesc || 'The battle has ended. One player stands strong in the snow, the other has fallen into fatigue and ashes!'}
         </p>
 
         <div style={{ width: '100%', maxWidth: '600px', height: '200px', overflow: 'hidden', borderRadius: '12px', display: 'flex', border: '1px solid rgba(255,255,255,0.08)' }}>
-          <GameLogs logs={gameState.logs} />
+          <GameLogs logs={gameState.logs} language={language} />
         </div>
 
         <div style={{ display: 'flex', gap: '16px', marginTop: '20px' }}>
-          <button className="btn-premium btn-clubs" onClick={() => handleStartGame(gameState.mode)}>
-            Play Again
-          </button>
+          {gameState.mode === 'online' && onlineRole === 'B' ? (
+            <div style={{ color: 'var(--text-dim)', alignSelf: 'center' }}>
+              Waiting for Player 1 (A) to restart...
+            </div>
+          ) : (
+            <button className="btn-premium btn-clubs" onClick={handlePlayAgain}>
+              {TRANSLATIONS[language].playAgain || 'Play Again'}
+            </button>
+          )}
           <button className="btn-premium" onClick={handleResetToMenu}>
-            Back to Menu
+            {TRANSLATIONS[language].backToMenu || 'Back to Menu'}
           </button>
         </div>
       </div>
@@ -343,6 +632,7 @@ export default function App() {
       <TurnOverlay 
         activePlayerName={activePlayerName}
         onConfirmReady={handleConfirmReady}
+        language={language}
       />
     );
   }
@@ -350,16 +640,19 @@ export default function App() {
   // 6. Active Gameplay scene
   return (
     <div className="app-container" style={{ display: 'grid', gridTemplateColumns: '1fr 340px' }}>
+      {renderLanguageToggle(true)}
       <GameBoard 
-        gameState={gameState}
+        gameState={stateForRender}
         onPlayNormal={handlePlayNormal}
         onPlayElite={handlePlayElite}
         onPlayUnderlay={handlePlayUnderlay}
         onCombat={handleCombat}
         onAttackPlayer={handleAttackPlayer}
         onEndTurn={handleEndTurn}
+        onlineRole={onlineRole}
+        language={language}
       />
-      <GameLogs logs={gameState.logs} />
+      <GameLogs logs={gameState.logs} language={language} />
     </div>
   );
 }

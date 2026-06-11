@@ -1,7 +1,7 @@
 import React from 'react';
 import { SUIT_LABELS } from '../game/deckBuilder';
 
-export default function Card({ card, onClick, isPlayable = false, isTargetable = false, isAttackReady = false, showBack = false }) {
+export default function Card({ card, onClick, isPlayable = false, isTargetable = false, isAttackReady = false, showBack = false, language = 'en' }) {
   if (showBack) {
     return (
       <div 
@@ -121,7 +121,7 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
           boxShadow: '0 0 6px rgba(34, 197, 94, 0.6)',
           zIndex: 5
         }}>
-          ⚔️ READY
+          {language === 'bg' ? '⚔️ ГОТОВ' : '⚔️ READY'}
         </div>
       )}
 
@@ -143,7 +143,7 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
           boxShadow: '0 0 6px rgba(245, 158, 11, 0.4)',
           zIndex: 5
         }}>
-          🛡️ TANK
+          {language === 'bg' ? '🛡️ ТАНК' : '🛡️ TANK'}
         </div>
       )}
 
@@ -165,7 +165,7 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
           boxShadow: '0 0 6px rgba(239, 68, 68, 0.6)',
           zIndex: 5
         }}>
-          ⚡ STUN: {stunnedTurns}
+          {language === 'bg' ? `⚡ СТЪН: ${stunnedTurns}` : `⚡ STUN: ${stunnedTurns}`}
         </div>
       )}
 

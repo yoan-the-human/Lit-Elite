@@ -230,7 +230,7 @@ function chooseAiAttackTarget(state, attacker) {
   const oppState = state.players.A;
 
   // Force Spades Tank attacking rule
-  const tanks = oppState.board.filter(c => c.isTank);
+  const tanks = oppState.board.filter(c => c.isTank && !(c.stunnedTurns > 0));
   if (tanks.length > 0) {
     // Must attack tank! Choose the tank with lowest HP or highest threat
     return tanks.sort((a, b) => a.hp - b.hp)[0];

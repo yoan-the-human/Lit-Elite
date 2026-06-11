@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import Card from './Card';
 import { SUIT_LABELS } from '../game/deckBuilder';
 
-export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinalElites }) {
+export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinalElites, language = 'en' }) {
   const { draft, phase } = gameState;
   const { 
     availableElites, 
@@ -16,16 +16,18 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
 
   const [selectedIds, setSelectedIds] = useState([]);
 
-  const currentDrafterName = currentDrafter === 'A' ? 'Player A' : (gameState.mode === 'ai' ? 'Computer (AI)' : 'Player B');
-  const selectionTurnName = selectionTurn === 'A' ? 'Player A' : (gameState.mode === 'ai' ? 'Computer (AI)' : 'Player B');
+  const currentDrafterName = currentDrafter === 'A' 
+    ? (language === 'bg' ? 'Играч А' : 'Player A') 
+    : (gameState.mode === 'ai' ? (language === 'bg' ? 'Компютър (AI)' : 'Computer (AI)') : (language === 'bg' ? 'Играч Б' : 'Player B'));
+  const selectionTurnName = selectionTurn === 'A' 
+    ? (language === 'bg' ? 'Играч А' : 'Player A') 
+    : (gameState.mode === 'ai' ? (language === 'bg' ? 'Компютър (AI)' : 'Computer (AI)') : (language === 'bg' ? 'Играч Б' : 'Player B'));
 
   // Handle final selection of 4 cards
   const handleToggleSelect = (cardId, rank, pool) => {
     if (selectedIds.includes(cardId)) {
       setSelectedIds(selectedIds.filter(id => id !== cardId));
     } else {
-      // Find if we already selected this rank to prevent duplicates, or let them toggle freely
-      // and validate at the end. Freely toggle with max 4 is cleaner.
       if (selectedIds.length < 4) {
         setSelectedIds([...selectedIds, cardId]);
       }
@@ -33,26 +35,36 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
   };
 
   const getRankCategoryLabel = (cat) => {
-    if (cat === null) return 'Any Category (Jack, Queen, King, Ace)';
+    const isBg = language === 'bg';
+    if (cat === null) return isBg ? 'Всяка категория (Вале, Дама, Поп, Асо)' : 'Any Category (Jack, Queen, King, Ace)';
     switch(cat) {
-      case 'K': return 'Kings (Value 13)';
-      case 'Q': return 'Queens (Value 12)';
-      case 'J': return 'Jacks (Value 11)';
-      case 'A': return 'Aces (Value 14)';
+      case 'K': return isBg ? 'Попове (Стойност 13)' : 'Kings (Value 13)';
+      case 'Q': return isBg ? 'Дами (Стойност 12)' : 'Queens (Value 12)';
+      case 'J': return isBg ? 'Валета (Стойност 11)' : 'Jacks (Value 11)';
+      case 'A': return isBg ? 'Аса (Стойност 14)' : 'Aces (Value 14)';
       default: return '';
     }
   };
 
   // Draft category rules helper text
   const getCategoryRulesHelp = (cat, selector) => {
-    const selectorName = selector === 'A' ? 'Player A' : (gameState.mode === 'ai' ? 'Computer (AI)' : 'Player B');
-    const opponentName = selector === 'A' ? (gameState.mode === 'ai' ? 'Computer (AI)' : 'Player B') : 'Player A';
+    const isBg = language === 'bg';
+    const selectorName = selector === 'A' 
+      ? (isBg ? 'Играч А' : 'Player A') 
+      : (gameState.mode === 'ai' ? (isBg ? 'Компютър (AI)' : 'Computer (AI)') : (isBg ? 'Играч Б' : 'Player B'));
+    const opponentName = selector === 'A' 
+      ? (gameState.mode === 'ai' ? (isBg ? 'Компютър (AI)' : 'Computer (AI)') : (isBg ? 'Играч Б' : 'Player B')) 
+      : (isBg ? 'Играч А' : 'Player A');
     
     if (cat === null) {
-      return `Category Selection Round: ${selectorName} must select ANY available Elite card to start drafting that rank category.`;
+      return isBg 
+        ? `Рунд за избор на категория: ${selectorName} трябва да избере ВСЯКА налична Елитна карта, за да стартира избора на този ранг.`
+        : `Category Selection Round: ${selectorName} must select ANY available Elite card to start drafting that rank category.`;
     }
     
-    return `Draft Order: ${selectorName} selected 1st -> ${opponentName} drafts 2 cards -> ${selectorName} automatically receives the remaining card.`;
+    return isBg
+      ? `Ред на избор: ${selectorName} избира 1-ви -> ${opponentName} избира 2 карти -> ${selectorName} автоматично получава последната.`
+      : `Draft Order: ${selectorName} selected 1st -> ${opponentName} drafts 2 cards -> ${selectorName} automatically receives the remaining card.`;
   };
 
   // Validate selection for final 4 elites
@@ -73,7 +85,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
 
   // Render Elite list for sidebars
   const renderEliteDraftedList = (elites) => {
-    if (elites.length === 0) return <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>No Elites drafted yet.</div>;
+    if (elites.length === 0) return <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{language === 'bg' ? 'Все още няма избрани Елитни карти.' : 'No Elites drafted yet.'}</div>;
     return (
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '8px' }}>
         {elites.map(card => {
@@ -99,7 +111,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
   };
 
   const renderNormalDraftedList = (normals) => {
-    if (normals.length === 0) return <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>No normal cards drafted yet.</div>;
+    if (normals.length === 0) return <div style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>{language === 'bg' ? 'Няма изтеглени нормални карти.' : 'No normal cards drafted yet.'}</div>;
     const grouped = normals.reduce((acc, card) => {
       acc[card.suit] = acc[card.suit] || [];
       acc[card.suit].push(card.value);
@@ -112,7 +124,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
         <div key={suit} style={{ marginBottom: '8px', fontSize: '0.85rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px', fontWeight: '600', color: label.color }}>
             <span>{label.symbol}</span>
-            <span>{label.name}</span>
+            <span>{language === 'bg' ? label.bulgarian : label.name}</span>
           </div>
           <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '2px' }}>
             {values.sort((a,b) => a-b).map((v, i) => (
@@ -144,7 +156,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
       <div className="draft-screen">
         <div className="draft-header" style={{ justifyContent: 'center' }}>
           <h2 className="draft-title" style={{ textAlign: 'center' }}>
-            Choose Your Deck Elites: <span style={{ color: 'var(--color-diamonds)' }}>{selectionTurnName}</span>
+            {language === 'bg' ? 'Изберете вашите Елитни карти:' : 'Choose Your Deck Elites:'} <span style={{ color: 'var(--color-diamonds)' }}>{selectionTurnName}</span>
           </h2>
         </div>
 
@@ -159,7 +171,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
           maxWidth: '800px',
           margin: '0 auto 20px auto'
         }}>
-          You drafted 8 Elite cards. Select <strong style={{ color: 'var(--color-diamonds)' }}>exactly 4 cards</strong> (exactly one Jack, one Queen, one King, and one Ace) to form your deck!
+          {language === 'bg' ? 'Изтеглихте 8 Елитни карти. Изберете точно 4 карти (точно едно Вале, една Дама, един Поп и едно Асо) за сформиране на вашето тесте!' : 'You drafted 8 Elite cards. Select exactly 4 cards (exactly one Jack, one Queen, one King, and one Ace) to form your deck!'}
         </div>
 
         <div style={{ 
@@ -175,7 +187,6 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
             <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
               {pool.map((card) => {
                 const isSelected = selectedIds.includes(card.id);
-                const label = SUIT_LABELS[card.suit];
                 return (
                   <div 
                     key={card.id} 
@@ -183,10 +194,12 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
                     onClick={() => {
                       // Block click for AI selection
                       if (gameState.mode === 'ai' && selectionTurn === 'B') return;
+                      // Block selection if online mode and not my turn
+                      if (gameState.mode === 'online' && gameState.onlineRole !== selectionTurn) return;
                       handleToggleSelect(card.id, card.rank, pool);
                     }}
                   >
-                    <Card card={card} />
+                    <Card card={card} language={language} />
                     {/* Select Checkbox overlay */}
                     <div style={{
                       position: 'absolute',
@@ -215,18 +228,18 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
             <div>
               <button 
                 className="btn-premium btn-clubs"
-                disabled={!isSelectionValid || (gameState.mode === 'ai' && selectionTurn === 'B')}
+                disabled={!isSelectionValid || (gameState.mode === 'ai' && selectionTurn === 'B') || (gameState.mode === 'online' && gameState.onlineRole !== selectionTurn)}
                 onClick={handleConfirmSelection}
                 style={{ fontSize: '1.1rem', padding: '12px 32px' }}
               >
-                Confirm Selected Elites
+                {language === 'bg' ? 'Потвърдете избраните Елити' : 'Confirm Selected Elites'}
               </button>
             </div>
           </div>
 
           {/* Sidebar showing normal cards for reference */}
           <div className="glass-panel" style={{ width: '260px', padding: '16px', alignSelf: 'flex-start', maxHeight: '70vh', overflowY: 'auto' }}>
-            <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', fontSize: '1rem', textAlign: 'center', color: 'var(--text-bright)' }}>Your Normals</h3>
+            <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', fontSize: '1rem', textAlign: 'center', color: 'var(--text-bright)' }}>{language === 'bg' ? 'Вашите Нормални' : 'Your Normals'}</h3>
             <div style={{ marginTop: '12px' }}>
               {renderNormalDraftedList(selectionTurn === 'A' ? draft.playerANormals : draft.playerBNormals)}
             </div>
@@ -242,9 +255,9 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
   return (
     <div className="draft-screen">
       <div className="draft-header">
-        <h2 className="draft-title">Phase II: Drafting Elite Cards</h2>
+        <h2 className="draft-title">{language === 'bg' ? 'Фаза II: Избиране на Елитни Карти' : 'Phase II: Drafting Elite Cards'}</h2>
         <div className="draft-turn-indicator" style={{ border: `1px solid ${currentDrafter === 'A' ? 'var(--color-spades)' : 'var(--color-hearts)'}` }}>
-          Drafter: <span style={{ color: currentDrafter === 'A' ? 'var(--color-spades)' : 'var(--color-hearts)', fontWeight: '700' }}>{currentDrafterName}</span>
+          {language === 'bg' ? 'Избиращ:' : 'Drafter:'} <span style={{ color: currentDrafter === 'A' ? 'var(--color-spades)' : 'var(--color-hearts)', fontWeight: '700' }}>{currentDrafterName}</span>
         </div>
       </div>
 
@@ -258,7 +271,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
         borderRadius: '8px'
       }}>
         <div style={{ fontWeight: '700', color: 'var(--text-bright)', marginBottom: '4px' }}>
-          Current Drafting Category: {getRankCategoryLabel(currentEliteCategory)}
+          {language === 'bg' ? 'Текуща категория за избор:' : 'Current Drafting Category:'} {getRankCategoryLabel(currentEliteCategory)}
         </div>
         {getCategoryRulesHelp(currentEliteCategory, eliteCategorySelector)}
       </div>
@@ -266,11 +279,11 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
       <div className="draft-container">
         {/* Left Sidebar: Player A */}
         <div className="glass-panel draft-sidebar" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
-          <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>Player A Stash</h3>
+          <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>{language === 'bg' ? 'Играч А - Сбор' : 'Player A Stash'}</h3>
           <div style={{ marginTop: '12px' }}>
-            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginBottom: '8px' }}>Elites</h4>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginBottom: '8px' }}>{language === 'bg' ? 'Елити' : 'Elites'}</h4>
             {renderEliteDraftedList(draftedElitesA)}
-            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginTop: '16px', marginBottom: '8px' }}>Normals</h4>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginTop: '16px', marginBottom: '8px' }}>{language === 'bg' ? 'Нормални' : 'Normals'}</h4>
             {renderNormalDraftedList(draft.playerANormals)}
           </div>
         </div>
@@ -278,13 +291,18 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
         {/* Center: Pool */}
         <div className="glass-panel draft-pool">
           <h3 style={{ fontSize: '1.25rem', fontWeight: '600' }}>
-            {currentEliteCategory === null ? "Choose Category by Selecting Card" : `Draft From Face-Up ${currentEliteCategory}'s`}
+            {currentEliteCategory === null ? (language === 'bg' ? 'Изберете категория чрез избиране на карта' : 'Choose Category by Selecting Card') : (language === 'bg' ? `Избирайте от наличните ${currentEliteCategory}` : `Draft From Face-Up ${currentEliteCategory}'s`)}
           </h3>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
             {availableElites.map((card) => {
               const isCurrentCategory = currentEliteCategory === null || card.rank === currentEliteCategory;
-              const isClickable = isCurrentCategory && isDrafterSelector && !(gameState.mode === 'ai' && currentDrafter === 'B');
+              let isClickable = isCurrentCategory && isDrafterSelector && !(gameState.mode === 'ai' && currentDrafter === 'B');
               
+              // If online mode, only let player draft if it's their turn
+              if (gameState.mode === 'online' && gameState.onlineRole !== currentDrafter) {
+                isClickable = false;
+              }
+
               return (
                 <div 
                   key={card.id}
@@ -299,6 +317,7 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
                     card={card} 
                     onClick={() => onDraftElite(card.id)}
                     isPlayable={isClickable}
+                    language={language}
                   />
                 </div>
               );
@@ -309,12 +328,12 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
         {/* Right Sidebar: Player B */}
         <div className="glass-panel draft-sidebar" style={{ maxHeight: '80vh', overflowY: 'auto' }}>
           <h3 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px' }}>
-            {gameState.mode === 'ai' ? 'Computer Stash' : 'Player B Stash'}
+            {gameState.mode === 'ai' ? (language === 'bg' ? 'Компютър - Сбор' : 'Computer Stash') : (language === 'bg' ? 'Играч Б - Сбор' : 'Player B Stash')}
           </h3>
           <div style={{ marginTop: '12px' }}>
-            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginBottom: '8px' }}>Elites</h4>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginBottom: '8px' }}>{language === 'bg' ? 'Елити' : 'Elites'}</h4>
             {renderEliteDraftedList(draftedElitesB)}
-            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginTop: '16px', marginBottom: '8px' }}>Normals</h4>
+            <h4 style={{ fontSize: '0.9rem', color: 'var(--color-diamonds)', marginTop: '16px', marginBottom: '8px' }}>{language === 'bg' ? 'Нормални' : 'Normals'}</h4>
             {renderNormalDraftedList(draft.playerBNormals)}
           </div>
         </div>

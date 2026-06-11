@@ -50,6 +50,7 @@ export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
         id: 'A',
         name: 'Player A',
         lp: 150,
+        maxLp: 150,
         deck: [],
         hand: [],
         board: [],
@@ -61,6 +62,7 @@ export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
         id: 'B',
         name: mode === 'ai' ? 'Computer (AI)' : 'Player B',
         lp: 150,
+        maxLp: 150,
         deck: [],
         hand: [],
         board: [],
@@ -500,13 +502,14 @@ export function healCharacter(state, player, target, healAmount) {
     const prevLp = pState.lp;
     pState.lp += healAmount;
     
-    if (pState.lp > 150) {
-      const excess = pState.lp - 150;
-      pState.lp = 150;
+    const maxLp = pState.maxLp || 150;
+    if (pState.lp > maxLp) {
+      const excess = pState.lp - maxLp;
+      pState.lp = maxLp;
       // Excess damage to opponent LP
       const opp = player === 'A' ? 'B' : 'A';
       state.players[opp].lp = Math.max(0, state.players[opp].lp - excess);
-      logEvent(state, `${pState.name} healed for ${healAmount}. LP capped at 150. Excess ${excess} damage dealt to opponent's LP!`);
+      logEvent(state, `${pState.name} healed for ${healAmount}. LP capped at ${maxLp}. Excess ${excess} damage dealt to opponent's LP!`);
       
       if (state.players[opp].lp <= 0) {
         state.winner = player;
@@ -568,9 +571,9 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
         // Draw 1
         drawCard(state, active);
       } else {
-        // Strike (Haste)
+        // Berserk (Haste)
         card.hasHaste = true;
-        logEvent(state, `${card.suit.toUpperCase()} ${card.value} gains Strike (Haste/Charge).`);
+        logEvent(state, `${card.suit.toUpperCase()} ${card.value} gains Berserk (Haste/Charge).`);
       }
     } else if (card.suit === 'hearts') {
       if (power === 1) {
@@ -589,9 +592,9 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
           }
         }
       } else {
-        // Damage opponent
+        // Sap opponent
         oppState.lp = Math.max(0, oppState.lp - card.value);
-        logEvent(state, `Direct damage: Deals ${card.value} damage to opponent's LP (Opponent LP: ${oppState.lp}).`);
+        logEvent(state, `Sap: Deals ${card.value} damage to opponent's LP (Opponent LP: ${oppState.lp}).`);
         if (oppState.lp <= 0) {
           state.winner = active;
           state.phase = 'GAME_OVER';
@@ -600,11 +603,11 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
       }
     } else if (card.suit === 'spades') {
       if (power === 1) {
-        // Power 1: Tank (Place card in front lane)
+        // Power 1: Bulwark (Become Tank)
         card.isTank = true;
-        logEvent(state, `${card.suit.toUpperCase()} ${card.value} becomes a Tank!`);
+        logEvent(state, `${card.suit.toUpperCase()} ${card.value} activates Bulwark! (Becomes a Tank)`);
       } else {
-        // Power 2: Stun (Stun one enemy card)
+        // Power 2: Knock out (Stun one enemy card)
         if (targetInfo) {
           const ecIdx = oppState.board.findIndex(c => c.id === targetInfo);
           if (ecIdx !== -1) {
@@ -613,29 +616,27 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
               logEvent(state, `Cannot stun Elite card ${ec.rank} of ${ec.suit.toUpperCase()} with a Normal Spades card!`);
               return state;
             }
-            ec.stunnedTurns = 1;
-            logEvent(state, `${card.value} of ${card.suit.toUpperCase()} stuns enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()} for 1 turn!`);
+            ec.stunnedTurns = (ec.stunnedTurns || 0) + 1;
+            logEvent(state, `${card.value} of ${card.suit.toUpperCase()} activates Knock out on enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()} for 1 turn!`);
           }
         }
       }
     } else if (card.suit === 'clubs') {
       if (power === 1) {
-        // Power 1: Scythe Sweep (AOE damage to all enemy board cards, self-destructs unless dual active)
+        // Power 1: Kamikaze (AOE damage to all enemy board cards, self-destructs unless dual active)
         if (!isDual) {
           shouldPlaceOnBoard = false;
         }
-        logEvent(state, `Scythe Sweep! Deals ${card.value} Clubs damage to all enemy board cards.`);
-        
-        // Loop backwards to handle defeated cards safely
+        logEvent(state, `Kamikaze! Deals ${card.value} Clubs damage to all enemy board cards.`);
         for (let i = oppState.board.length - 1; i >= 0; i--) {
           const ec = oppState.board[i];
           if (ec.shield) {
             const shieldThreshold = ec.hp;
             if (card.value >= shieldThreshold) {
               ec.shield = false;
-              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble POPPED by Scythe Sweep.`);
+              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble POPPED by Kamikaze.`);
             } else {
-              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble absorbs Scythe Sweep damage and does not pop.`);
+              logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble absorbs Kamikaze damage and does not pop.`);
             }
           } else {
             ec.hp -= card.value;
@@ -645,14 +646,11 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
           if (ec.hp <= 0) {
             oppState.board.splice(i, 1);
             oppState.defeated.push(ec);
-            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Scythe Sweep!`);
+            logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Kamikaze!`);
           }
         }
-        if (!isDual) {
-          pState.defeated.push(card);
-        }
       } else {
-        // Power 2: Shield Strike (damage to single enemy card, stays on board)
+        // Power 2: Detonate (damage to single enemy card, stays on board)
         if (targetInfo) {
           const ecIdx = oppState.board.findIndex(c => c.id === targetInfo);
           if (ecIdx !== -1) {
@@ -661,19 +659,19 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
               const shieldThreshold = ec.hp;
               if (card.value >= shieldThreshold) {
                 ec.shield = false;
-                logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble POPPED by Shield Strike.`);
+                logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble POPPED by Detonate.`);
               } else {
-                logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble absorbs Shield Strike damage and does not pop.`);
+                logEvent(state, `Enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}'s shield bubble absorbs Detonate damage and does not pop.`);
               }
             } else {
               ec.hp -= card.value;
-              logEvent(state, `Shield Strike! Deals ${card.value} Clubs damage to enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}.`);
+              logEvent(state, `Detonate! Deals ${card.value} Clubs damage to enemy ${ec.rank || ec.value} of ${ec.suit.toUpperCase()}.`);
             }
             
             if (ec.hp <= 0) {
               oppState.board.splice(ecIdx, 1);
               oppState.defeated.push(ec);
-              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Shield Strike!`);
+              logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Detonate!`);
             }
           }
         }
@@ -853,9 +851,8 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
                 logEvent(state, `Mind Control on ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()} is blocked by Shield! Shield is removed.`);
               } else {
                 oppState.board.splice(ecIdx, 1);
-                // Clean up stuns/tanks before joining new board
+                // Clean up tanks before joining new board (keep stun status)
                 enemyCard.isTank = false;
-                enemyCard.stunnedTurns = 0;
                 pState.board.push(enemyCard);
                 logEvent(state, `MIND CONTROL! Steals enemy card ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()}`);
               }
@@ -882,13 +879,15 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
         }
       }
     } else if (rank === 'A') {
-      // Ace: [0] Underlay, [1] Both restore 50 LP
+      // Ace: [0] Underlay, [1] Both increase health by 50 LP
       if (abilityIdx === 0) {
         underlayCallback();
       } else {
-        healCharacter(state, 'A', 'player', 50);
-        healCharacter(state, 'B', 'player', 50);
-        logEvent(state, "Ace of Hearts triggers: Both players restore 50 LP!");
+        state.players['A'].maxLp = (state.players['A'].maxLp || 150) + 50;
+        state.players['A'].lp += 50;
+        state.players['B'].maxLp = (state.players['B'].maxLp || 150) + 50;
+        state.players['B'].lp += 50;
+        logEvent(state, "Ace of Hearts triggers: Both players' health is increased by 50 LP!");
       }
     }
   } else if (suit === 'spades') {
@@ -898,7 +897,7 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
       if (abilityIdx === 0) {
         targetElite.isTank = true;
         oppState.board.forEach(ec => {
-          ec.stunnedTurns = turns;
+          ec.stunnedTurns = (ec.stunnedTurns || 0) + turns;
         });
         logEvent(state, `${targetElite.rank} of SPADES becomes a Tank and STUNS all enemy board cards for ${turns} turns!`);
       } else {
@@ -906,12 +905,19 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
         const allowedRanks = rank === 'J' ? ['A', 'J'] : rank === 'Q' ? ['A', 'J', 'Q'] : ['A', 'J', 'Q', 'K'];
         
         if (!chosenCardId) {
-          // If no card ID is passed (e.g. AI is playing), automatically choose the best one from the deck
+          // If no card ID is passed (e.g. AI is playing), automatically choose the best one from the deck or defeated
           const eligibleInDeck = pState.deck.filter(c => c.isElite && allowedRanks.includes(c.rank));
           if (eligibleInDeck.length > 0) {
             const rankOrder = { 'A': 4, 'K': 3, 'Q': 2, 'J': 1 };
             eligibleInDeck.sort((a, b) => (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0));
             chosenCardId = eligibleInDeck[0].id;
+          } else {
+            const eligibleInDefeated = pState.defeated.filter(c => c.isElite && allowedRanks.includes(c.rank));
+            if (eligibleInDefeated.length > 0) {
+              const rankOrder = { 'A': 4, 'K': 3, 'Q': 2, 'J': 1 };
+              eligibleInDefeated.sort((a, b) => (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0));
+              chosenCardId = eligibleInDefeated[0].id;
+            }
           }
         }
         
@@ -921,11 +927,44 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
             const cardToDraw = pState.deck[deckIdx];
             pState.deck.splice(deckIdx, 1);
             pState.hand.push(cardToDraw);
-            logEvent(state, `${pState.name} searches deck and draws ${cardToDraw.rank} of ${cardToDraw.suit.toUpperCase()}.`);
+            logEvent(state, `${pState.name} searches deck and draws an Elite card.`);
             update10CardBuff(pState);
+          } else {
+            const defIdx = pState.defeated.findIndex(c => c.id === chosenCardId);
+            if (defIdx !== -1) {
+              const cardToDraw = pState.defeated[defIdx];
+              pState.defeated.splice(defIdx, 1);
+              
+              // Reset stats when drawing back
+              cardToDraw.atk = cardToDraw.baseAtk;
+              cardToDraw.hp = cardToDraw.baseHp;
+              cardToDraw.maxHp = cardToDraw.baseHp;
+              cardToDraw.shield = false;
+              cardToDraw.isTank = false;
+              cardToDraw.stunnedTurns = 0;
+              cardToDraw.underlays = [];
+              cardToDraw.attackedThisTurn = 0;
+              cardToDraw.hasHaste = false;
+              
+              pState.hand.push(cardToDraw);
+              
+              // Take fatigue damage
+              state.defeatedDrawsCount[player] += 1;
+              const fatigueDamage = state.defeatedDrawsCount[player];
+              pState.lp = Math.max(0, pState.lp - fatigueDamage);
+              
+              logEvent(state, `${pState.name} searches DEFEATED pile and draws an Elite card, taking ${fatigueDamage} fatigue damage!`);
+              update10CardBuff(pState);
+              
+              if (pState.lp <= 0) {
+                state.winner = player === 'A' ? 'B' : 'A';
+                state.phase = 'GAME_OVER';
+                logEvent(state, `${pState.name} died to fatigue damage. Game Over!`);
+              }
+            }
           }
         } else {
-          logEvent(state, `${pState.name} searches deck but finds no eligible Elite cards.`);
+          logEvent(state, `${pState.name} searches but finds no eligible Elite cards.`);
         }
       }
     } else if (rank === 'A') {
@@ -933,8 +972,8 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
       if (abilityIdx === 0) {
         underlayCallback();
       } else {
-        pState.board.forEach(c => { c.stunnedTurns = 4; });
-        oppState.board.forEach(c => { c.stunnedTurns = 4; });
+        pState.board.forEach(c => { c.stunnedTurns = (c.stunnedTurns || 0) + 4; });
+        oppState.board.forEach(c => { c.stunnedTurns = (c.stunnedTurns || 0) + 4; });
         logEvent(state, "Ace of Spades triggers: Entire board (all cards) is STUNNED for 4 turns!");
       }
     }
@@ -967,19 +1006,23 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
             logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Elite Clubs!`);
           }
         }
-      } else {
-        // Summon defeated Clubs
-        const eligible = pState.defeated
-          .filter(c => c.suit === 'clubs' && c.value < dmg)
-          .sort((a, b) => b.value - a.value);
+        // Summon defeated Clubs from both players
+        const allDefeated = [
+          ...pState.defeated.map(c => ({ card: c, ownerState: pState })),
+          ...oppState.defeated.map(c => ({ card: c, ownerState: oppState }))
+        ];
+        
+        const eligible = allDefeated
+          .filter(entry => entry.card.suit === 'clubs' && entry.card.value < dmg)
+          .sort((a, b) => b.card.value - a.card.value);
         
         let summoned = 0;
         for (let i = 0; i < count; i++) {
           if (eligible.length > summoned) {
-            const resCard = eligible[summoned++];
-            const idx = pState.defeated.findIndex(c => c.id === resCard.id);
+            const { card: resCard, ownerState } = eligible[summoned++];
+            const idx = ownerState.defeated.findIndex(c => c.id === resCard.id);
             if (idx !== -1) {
-              pState.defeated.splice(idx, 1);
+              ownerState.defeated.splice(idx, 1);
               
               // Elites summoning normal clubs keep base stats (strictly less than dmg condition, already normal)
               resCard.atk = resCard.baseAtk;
@@ -989,6 +1032,9 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
               resCard.isTank = false;
               resCard.stunnedTurns = 0;
               resCard.underlays = [];
+              resCard.playedThisTurn = true; // summoning sickness
+              resCard.attackedThisTurn = 0;
+              resCard.hasHaste = false;
               
               pState.board.push(resCard);
               logEvent(state, `Summons defeated Clubs: ${resCard.suit.toUpperCase()} ${resCard.value} to board.`);
@@ -1036,7 +1082,7 @@ export function executeCombat(state, attackerId, defenderId) {
   }
   
   // Force Spades Tank attacking rule
-  const tanksOnOppBoard = oppState.board.filter(c => c.isTank);
+  const tanksOnOppBoard = oppState.board.filter(c => c.isTank && !(c.stunnedTurns > 0));
   if (tanksOnOppBoard.length > 0 && !defender.isTank) {
     logEvent(state, `You must attack the enemy Spades Tank first!`);
     return state;
@@ -1047,7 +1093,7 @@ export function executeCombat(state, attackerId, defenderId) {
   
   // Combat math:
   let attackerDmgDealt = attacker.atk;
-  let defenderDmgDealt = defender.atk;
+  let defenderDmgDealt = (defender.stunnedTurns > 0) ? 0 : defender.atk;
   
   const defenderPrevHp = defender.hp;
   const attackerPrevHp = attacker.hp;
@@ -1154,7 +1200,7 @@ export function executeAttackPlayer(state, attackerId) {
   }
   
   // Can only attack direct if opponent has no Spades Tanks on board
-  if (oppState.board.some(c => c.isTank)) {
+  if (oppState.board.some(c => c.isTank && !(c.stunnedTurns > 0))) {
     logEvent(state, `Cannot attack opponent LP direct while they have Spades Tanks on board!`);
     return state;
   }
