@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [1.0.2](https://github.com/yoan-the-human/Lit-Elite/compare/v1.0.0...v1.0.2) (2026-06-11)
+
+
+### 🐛 Бъгове
+
+* club elites power name edit; elite clubs detonation fix; cards in deck fix; interface zoom fix; game is playable on phone; online multiplayer fix; version update ([de1f9da](https://github.com/yoan-the-human/Lit-Elite/commit/de1f9da431439446a2e7bffcb7e0156adabd40ff))
+
 ## [1.0.0](https://github.com/yoan-the-human/Lit-Elite/compare/v0.2.5...v1.0.0) (2026-06-11)
 
 
