@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+## [1.0.0](https://github.com/yoan-the-human/Lit-Elite/compare/v0.2.5...v1.0.0) (2026-06-11)
+
+
+### 🚀 Новости
+
+* better tanking, better spades 2nd power, better field size, nerfed mind control, bug with clubs, stun got stackable, change ace of hearts, bug with clubs 2, better battle log, new names for attacks, translation options, online mode? ([2690e09](https://github.com/yoan-the-human/Lit-Elite/commit/2690e093a52095fa0004d8ad2e967e246b3bf9f2))
+
 ### [0.2.5](https://github.com/yoan-the-human/Lit-Elite/compare/v0.2.4...v0.2.5) (2026-06-05)
 
 
