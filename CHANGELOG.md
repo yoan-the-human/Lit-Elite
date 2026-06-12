@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+## [1.4.0](https://github.com/yoan-the-human/Lit-Elite/compare/v1.3.0...v1.4.0) (2026-06-12)
+
+
+### 🚀 Новости
+
+* forbidden cards indicator for slower game; improve: mobile versio; bug: multiplayer online; ([54b279a](https://github.com/yoan-the-human/Lit-Elite/commit/54b279a146debecc7123871d6deb7a10c14f8601))
+
 ## [1.3.0](https://github.com/yoan-the-human/Lit-Elite/compare/v1.2.0...v1.3.0) (2026-06-12)
 
 
