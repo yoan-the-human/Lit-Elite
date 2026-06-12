@@ -126,7 +126,8 @@ export default function App() {
     const targetUrl = url || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://lit-elite-server.onrender.com');
     const newSocket = io(targetUrl, {
       transports: ['polling', 'websocket'],
-      timeout: 5000
+      timeout: 5000,
+      withCredentials: true
     });
 
     socketRef.current = newSocket;

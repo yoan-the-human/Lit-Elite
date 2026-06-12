@@ -342,6 +342,9 @@ export default function GameBoard({
 
     // Case 4: Underlay Ace targeting
     if (isUnderlayTargeting && playerOwner === activePlayer && card.isElite) {
+      if (card.stunnedTurns > 0) {
+        return; // Block underlay on stunned card
+      }
       if (pendingUnderlayAce && pendingUnderlayAce.suit === card.suit) {
         // Block same suit underlay
         return;
@@ -476,7 +479,7 @@ export default function GameBoard({
         if (card.atk <= limit) isTargetable = true;
       }
       if (isUnderlayTargeting && !isOpponentOfActive && card.isElite) {
-        if (pendingUnderlayAce && pendingUnderlayAce.suit !== card.suit) {
+        if (pendingUnderlayAce && pendingUnderlayAce.suit !== card.suit && !(card.stunnedTurns > 0)) {
           isTargetable = true;
         }
       }
@@ -714,8 +717,8 @@ export default function GameBoard({
             <div style={{ fontSize: '1.25rem', fontWeight: '800' }}>{activePlayer === 'A' ? pA.deck.length : pB.deck.length}</div>
           </div>
           <div className="deck-status-box" style={{ borderLeftColor: 'var(--color-hearts)' }}>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{language === 'bg' ? 'ПОБЕДЕНИ' : 'DEFEATED'} ({activePlayer === 'A' ? 'P1' : 'P2'})</div>
-            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-hearts)' }}>{activePlayer === 'A' ? pA.defeated.length : pB.defeated.length}</div>
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>{language === 'bg' ? 'ПОБЕДЕНИ' : 'DEFEATED'}</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: '800', color: 'var(--color-hearts)' }}>{gameState.defeated.length}</div>
           </div>
         </div>
 
@@ -829,7 +832,7 @@ export default function GameBoard({
 
             {(() => {
               const myDeck = activePlayer === 'A' ? pA.deck : pB.deck;
-              const allDefeated = [...pA.defeated, ...pB.defeated];
+              const allDefeated = gameState.defeated;
               
               const eligibleDeckElites = myDeck.filter(c => c.isElite && searchAllowedRanks.includes(c.rank)).map(c => ({ ...c, fromPile: 'deck' }));
               const eligibleDefeatedElites = allDefeated.filter(c => c.isElite && searchAllowedRanks.includes(c.rank)).map(c => ({ ...c, fromPile: 'defeated' }));

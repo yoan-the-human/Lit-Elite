@@ -54,8 +54,8 @@ export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
         deck: [],
         hand: [],
         board: [],
-        defeated: [], // Defeated Pile (FIFO queue)
         has10CardBuff: false,
+        hasBoardBarrierBuff: false,
         cardsPlayedThisTurn: 0
       },
       B: {
@@ -66,8 +66,8 @@ export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
         deck: [],
         hand: [],
         board: [],
-        defeated: [],
         has10CardBuff: false,
+        hasBoardBarrierBuff: false,
         cardsPlayedThisTurn: 0
       }
     },
@@ -75,6 +75,7 @@ export function getInitialGameState(mode = 'hotseat', startingPlayer = 'A') {
     activePlayer: startingPlayer, // 'A' or 'B'
     turnCount: 1,
     defeatedDrawsCount: { A: 0, B: 0 }, // fatigue counters
+    defeated: [], // Defeated Pile (FIFO queue)
     resurrectionCandidate: null, // { card, threshold }
     logs: [],
     
@@ -97,14 +98,36 @@ export function update10CardBuff(playerState) {
   }
 }
 
+// Check and update the 10-cards on board buff state for a player
+export function checkBoardBarrierBuff(state, player) {
+  const pState = state.players[player];
+  if (!pState) return;
+  const boardSize = pState.board.length;
+  
+  if (boardSize >= 10) {
+    if (!pState.hasBoardBarrierBuff) {
+      pState.hasBoardBarrierBuff = true;
+      pState.board.forEach(card => {
+        card.shield = true;
+      });
+      logEvent(state, `10-CARDS ON BOARD BUFF! All friendly board cards gain a protective barrier!`);
+    }
+  } else if (boardSize <= 6) {
+    if (pState.hasBoardBarrierBuff) {
+      pState.hasBoardBarrierBuff = false;
+      logEvent(state, `Board cards for ${pState.name} dropped to ${boardSize}. 10-cards board barrier buff has reset.`);
+    }
+  }
+}
+
 // Draw card function
 export function drawCard(state, player) {
   const pState = state.players[player];
   
   if (pState.deck.length === 0) {
     // Defeated Pile (FIFO Queue) draw
-    if (pState.defeated.length > 0) {
-      const card = pState.defeated.shift();
+    if (state.defeated.length > 0) {
+      const card = state.defeated.shift();
       state.defeatedDrawsCount[player] += 1;
       const fatigueDamage = state.defeatedDrawsCount[player];
       pState.lp = Math.max(0, pState.lp - fatigueDamage);
@@ -437,6 +460,8 @@ export function startTurn(state) {
     drawCard(state, active);
   }
   
+  checkBoardBarrierBuff(state, 'A');
+  checkBoardBarrierBuff(state, 'B');
   return state;
 }
 
@@ -645,7 +670,7 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
           
           if (ec.hp <= 0) {
             oppState.board.splice(i, 1);
-            oppState.defeated.push(ec);
+            state.defeated.push(ec);
             logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Kamikaze!`);
           }
         }
@@ -670,7 +695,7 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
             
             if (ec.hp <= 0) {
               oppState.board.splice(ecIdx, 1);
-              oppState.defeated.push(ec);
+              state.defeated.push(ec);
               logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Detonate!`);
             }
           }
@@ -686,6 +711,8 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
   
   update10CardBuff(pState);
   state.pendingPlay = null;
+  checkBoardBarrierBuff(state, 'A');
+  checkBoardBarrierBuff(state, 'B');
   return state;
 }
 
@@ -723,7 +750,7 @@ export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = n
   
   if (card.rank === 'A') {
     shouldPlaceOnBoard = false;
-    pState.defeated.push(card);
+    state.defeated.push(card);
     logEvent(state, `Ace of ${card.suit.toUpperCase()} consumed and sent to Defeated Pile.`);
   }
   
@@ -733,6 +760,8 @@ export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = n
   
   update10CardBuff(pState);
   state.pendingPlay = null;
+  checkBoardBarrierBuff(state, 'A');
+  checkBoardBarrierBuff(state, 'B');
   return state;
 }
 
@@ -754,6 +783,11 @@ export function playUnderlayAce(state, aceId, targetEliteId, chosenAbilityIndex,
   const targetElite = pState.board.find(c => c.id === targetEliteId);
   if (!targetElite || !targetElite.isElite) return state;
   
+  if (targetElite.stunnedTurns > 0) {
+    logEvent(state, `Cannot underlay Ace under a stunned Elite card!`);
+    return state;
+  }
+  
   if (ace.suit === targetElite.suit) {
     logEvent(state, `Cannot underlay Ace of ${ace.suit.toUpperCase()} under Elite of the SAME suit!`);
     return state;
@@ -773,6 +807,8 @@ export function playUnderlayAce(state, aceId, targetEliteId, chosenAbilityIndex,
   resolveEliteAbility(state, active, targetElite, ace.suit, chosenAbilityIndex, extraParams, () => {});
   
   update10CardBuff(pState);
+  checkBoardBarrierBuff(state, 'A');
+  checkBoardBarrierBuff(state, 'B');
   return state;
 }
 
@@ -912,7 +948,7 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
             eligibleInDeck.sort((a, b) => (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0));
             chosenCardId = eligibleInDeck[0].id;
           } else {
-            const eligibleInDefeated = pState.defeated.filter(c => c.isElite && allowedRanks.includes(c.rank));
+            const eligibleInDefeated = state.defeated.filter(c => c.isElite && allowedRanks.includes(c.rank));
             if (eligibleInDefeated.length > 0) {
               const rankOrder = { 'A': 4, 'K': 3, 'Q': 2, 'J': 1 };
               eligibleInDefeated.sort((a, b) => (rankOrder[b.rank] || 0) - (rankOrder[a.rank] || 0));
@@ -930,16 +966,11 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
             logEvent(state, `${pState.name} searches deck and draws an Elite card.`);
             update10CardBuff(pState);
           } else {
-            let defIdx = pState.defeated.findIndex(c => c.id === chosenCardId);
-            let targetDefeatedPile = pState.defeated;
-            if (defIdx === -1) {
-              defIdx = oppState.defeated.findIndex(c => c.id === chosenCardId);
-              targetDefeatedPile = oppState.defeated;
-            }
+            let defIdx = state.defeated.findIndex(c => c.id === chosenCardId);
 
             if (defIdx !== -1) {
-              const cardToDraw = targetDefeatedPile[defIdx];
-              targetDefeatedPile.splice(defIdx, 1);
+              const cardToDraw = state.defeated[defIdx];
+              state.defeated.splice(defIdx, 1);
               
               // Reset stats when drawing back
               cardToDraw.atk = cardToDraw.baseAtk;
@@ -1008,16 +1039,13 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
           
           if (ec.hp <= 0) {
             oppState.board.splice(i, 1);
-            oppState.defeated.push(ec);
+            state.defeated.push(ec);
             logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Elite Clubs!`);
           }
         }
       } else if (abilityIdx === 1) {
         // Summon defeated normal Clubs from both players
-        const allDefeated = [
-          ...pState.defeated.map(c => ({ card: c, ownerState: pState })),
-          ...oppState.defeated.map(c => ({ card: c, ownerState: oppState }))
-        ];
+        const allDefeated = state.defeated.map(c => ({ card: c }));
         
         const eligible = allDefeated
           .filter(entry => entry.card.suit === 'clubs' && !entry.card.isElite && entry.card.value < dmg)
@@ -1026,10 +1054,10 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
         let summoned = 0;
         for (let i = 0; i < count; i++) {
           if (eligible.length > summoned) {
-            const { card: resCard, ownerState } = eligible[summoned++];
-            const idx = ownerState.defeated.findIndex(c => c.id === resCard.id);
+            const { card: resCard } = eligible[summoned++];
+            const idx = state.defeated.findIndex(c => c.id === resCard.id);
             if (idx !== -1) {
-              ownerState.defeated.splice(idx, 1);
+              state.defeated.splice(idx, 1);
               
               // Elites summoning normal clubs keep base stats (strictly less than dmg condition, already normal)
               resCard.atk = resCard.baseAtk;
@@ -1056,12 +1084,12 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
       } else {
         // Move all board cards to defeated piles
         for (let i = pState.board.length - 1; i >= 0; i--) {
-          pState.defeated.push(pState.board[i]);
+          state.defeated.push(pState.board[i]);
         }
         pState.board = [];
         
         for (let i = oppState.board.length - 1; i >= 0; i--) {
-          oppState.defeated.push(oppState.board[i]);
+          state.defeated.push(oppState.board[i]);
         }
         oppState.board = [];
         
@@ -1175,7 +1203,7 @@ export function executeCombat(state, attackerId, defenderId) {
     if (idx !== -1) {
       oppState.board.splice(idx, 1);
     }
-    oppState.defeated.push(defender);
+    state.defeated.push(defender);
     logEvent(state, `Defender ${defender.suit.toUpperCase()} ${defender.rank || defender.value} is defeated!`);
   }
   
@@ -1184,10 +1212,12 @@ export function executeCombat(state, attackerId, defenderId) {
     if (idx !== -1) {
       pState.board.splice(idx, 1);
     }
-    pState.defeated.push(attacker);
+    state.defeated.push(attacker);
     logEvent(state, `Attacker ${attacker.suit.toUpperCase()} ${attacker.rank || attacker.value} is defeated!`);
   }
   
+  checkBoardBarrierBuff(state, 'A');
+  checkBoardBarrierBuff(state, 'B');
   return state;
 }
 

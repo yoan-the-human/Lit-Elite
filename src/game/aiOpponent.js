@@ -134,7 +134,7 @@ function playAiElite(state, card) {
     } else {
       // J, Q, K: Detonate if opponent board has multiple cards, else resurrect Clubs
       const dmg = card.rank === 'J' ? 12 : card.rank === 'Q' ? 13 : 14;
-      const defeatedClubs = pB.defeated.filter(c => c.suit === 'clubs' && !c.isElite && c.value < dmg);
+      const defeatedClubs = state.defeated.filter(c => c.suit === 'clubs' && !c.isElite && c.value < dmg);
       
       if (oppState.board.length >= 2) {
         abilityIdx = 0; // Deal damage to all
