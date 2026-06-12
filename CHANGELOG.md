@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+## [1.3.0](https://github.com/yoan-the-human/Lit-Elite/compare/v1.2.0...v1.3.0) (2026-06-12)
+
+
+### 🚀 Новости
+
+* new buff - 10 cards on board buff ([ad9b1e4](https://github.com/yoan-the-human/Lit-Elite/commit/ad9b1e45920fd62b3bf7795c9d081aa74cc4b7fe))
+
 ## [1.2.0](https://github.com/yoan-the-human/Lit-Elite/compare/v1.0.4...v1.2.0) (2026-06-12)
 
 
