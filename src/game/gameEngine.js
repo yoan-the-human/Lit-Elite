@@ -731,6 +731,20 @@ export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = n
   if (cardIdx === -1) return state;
   const card = pState.hand[cardIdx];
   
+  // Enforce forbidden elite rank turn restrictions
+  if (state.turnCount === 1 && (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K')) {
+    logEvent(state, `Forbidden: Cannot play ${card.rank} on turn 1!`);
+    return state;
+  }
+  if (state.turnCount === 2 && (card.rank === 'Q' || card.rank === 'K')) {
+    logEvent(state, `Forbidden: Cannot play ${card.rank} on turn 2!`);
+    return state;
+  }
+  if (state.turnCount === 3 && card.rank === 'K') {
+    logEvent(state, `Forbidden: Cannot play K on turn 3!`);
+    return state;
+  }
+  
   pState.hand.splice(cardIdx, 1);
   pState.cardsPlayedThisTurn += 1;
   
@@ -889,6 +903,8 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
                 oppState.board.splice(ecIdx, 1);
                 // Clean up tanks before joining new board (keep stun status)
                 enemyCard.isTank = false;
+                // Mind controlled card gets summoning sickness on new owner's board
+                enemyCard.playedThisTurn = true;
                 pState.board.push(enemyCard);
                 logEvent(state, `MIND CONTROL! Steals enemy card ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()}`);
               }

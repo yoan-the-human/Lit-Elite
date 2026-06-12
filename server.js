@@ -1,27 +1,18 @@
 import express from 'express';
-import http from 'http';
-import { Server } from 'socket.io';
 import cors from 'cors';
 
 const app = express();
+
+// Standard CORS options allowing all origins and headers
 app.use(cors());
+app.use(express.json());
 
 app.get('/', (req, res) => {
-  res.send('Lit Elite Multiplayer Server is running!');
+  res.send('Lit Elite Multiplayer Polling Server is running!');
 });
 
-const server = http.createServer(app);
-const io = new Server(server, {
-  cors: {
-    origin: (origin, callback) => {
-      callback(null, true);
-    },
-    methods: ['GET', 'POST'],
-    credentials: true
-  }
-});
-
-const rooms = {}; // roomCode -> { players: { A: socketId, B: socketId }, state: gameState, isPrivate: boolean }
+// rooms store: roomCode -> { players: { A: clientId, B: clientId }, lastPoll: { A: timestamp, B: timestamp }, state: gameState, isPrivate: boolean, startingPlayer: string }
+const rooms = {};
 
 function getPublicRooms() {
   const list = [];
@@ -37,99 +28,157 @@ function getPublicRooms() {
   return list;
 }
 
-function broadcastPublicRooms() {
-  io.to('lobby').emit('public_rooms_list', getPublicRooms());
-}
+// REST API Endpoints
 
-io.on('connection', (socket) => {
-  console.log('User connected:', socket.id);
-  
-  socket.on('join_lobby', () => {
-    socket.join('lobby');
-    socket.emit('public_rooms_list', getPublicRooms());
-    console.log(`Socket ${socket.id} joined lobby.`);
-  });
-  
-  socket.on('leave_lobby', () => {
-    socket.leave('lobby');
-    console.log(`Socket ${socket.id} left lobby.`);
-  });
-  
-  socket.on('get_public_rooms', () => {
-    socket.emit('public_rooms_list', getPublicRooms());
-  });
+// 1. Get public rooms (Lobby list)
+app.get('/api/lobby', (req, res) => {
+  res.json(getPublicRooms());
+});
 
-  socket.on('create_room', ({ mode, startingPlayer, isPrivate }) => {
-    const code = Math.floor(1000 + Math.random() * 9000).toString();
-    rooms[code] = {
-      players: { A: socket.id },
-      state: null,
-      startingPlayer: startingPlayer,
-      isPrivate: !!isPrivate
-    };
-    socket.join(code);
-    socket.leave('lobby'); // Leave lobby when entering room
-    socket.emit('room_created', { code, isPrivate: !!isPrivate });
-    console.log(`Room ${code} created by Player A (${socket.id}) - Private: ${isPrivate}`);
-    broadcastPublicRooms();
-  });
-  
-  socket.on('join_room', ({ code }) => {
-    const room = rooms[code];
-    if (room) {
-      if (!room.players.B) {
-        room.players.B = socket.id;
-        socket.join(code);
-        socket.leave('lobby'); // Leave lobby when entering room
-        socket.emit('room_joined', { code, role: 'B', startingPlayer: room.startingPlayer });
-        io.to(room.players.A).emit('player_joined', { role: 'B' });
-        console.log(`Player B (${socket.id}) joined Room ${code}`);
-        broadcastPublicRooms();
-      } else {
-        socket.emit('room_error', 'Room is full!');
-      }
-    } else {
-      socket.emit('room_error', 'Room not found!');
+// 2. Create room
+app.post('/api/rooms', (req, res) => {
+  const { clientId, startingPlayer, isPrivate } = req.body;
+  if (!clientId) {
+    return res.status(400).send('clientId is required.');
+  }
+
+  const code = Math.floor(1000 + Math.random() * 9000).toString();
+  rooms[code] = {
+    players: { A: clientId },
+    lastPoll: { A: Date.now() },
+    state: null,
+    startingPlayer: startingPlayer,
+    isPrivate: !!isPrivate
+  };
+
+  console.log(`Room ${code} created by Player A (${clientId}) - Private: ${isPrivate}`);
+  res.json({ code, isPrivate: !!isPrivate });
+});
+
+// 3. Join room
+app.post('/api/rooms/:code/join', (req, res) => {
+  const { code } = req.params;
+  const { clientId } = req.body;
+  if (!clientId) {
+    return res.status(400).send('clientId is required.');
+  }
+
+  const room = rooms[code];
+  if (!room) {
+    return res.status(404).send('Room not found!');
+  }
+
+  if (room.players.A === clientId) {
+    // Rejoining as A
+    room.lastPoll.A = Date.now();
+    return res.json({ code, role: 'A', startingPlayer: room.startingPlayer });
+  }
+
+  if (room.players.B === clientId) {
+    // Rejoining as B
+    room.lastPoll.B = Date.now();
+    return res.json({ code, role: 'B', startingPlayer: room.startingPlayer });
+  }
+
+  if (!room.players.B) {
+    room.players.B = clientId;
+    room.lastPoll.B = Date.now();
+    console.log(`Player B (${clientId}) joined Room ${code}`);
+    return res.json({ code, role: 'B', startingPlayer: room.startingPlayer });
+  } else {
+    return res.status(400).send('Room is full!');
+  }
+});
+
+// 4. Update state
+app.post('/api/rooms/:code/state', (req, res) => {
+  const { code } = req.params;
+  const { clientId, state } = req.body;
+  const room = rooms[code];
+  if (room) {
+    room.state = state;
+    // Also track poll activity
+    if (room.players.A === clientId) room.lastPoll.A = Date.now();
+    if (room.players.B === clientId) room.lastPoll.B = Date.now();
+    res.json({ success: true });
+  } else {
+    res.status(404).send('Room not found.');
+  }
+});
+
+// 5. Leave room
+app.post('/api/rooms/:code/leave', (req, res) => {
+  const { code } = req.params;
+  const { clientId } = req.body;
+  const room = rooms[code];
+  if (room) {
+    if (room.players.A === clientId || room.players.B === clientId) {
+      console.log(`Room ${code} destroyed because player ${clientId} left.`);
+      delete rooms[code];
     }
-  });
-  
-  socket.on('leave_room', ({ code }) => {
-    const room = rooms[code];
-    if (room) {
-      if (room.players.A === socket.id || room.players.B === socket.id) {
-        socket.leave(code);
-        io.to(code).emit('player_left');
-        delete rooms[code];
-        console.log(`Room ${code} destroyed because player left.`);
-        broadcastPublicRooms();
-      }
+  }
+  res.json({ success: true });
+});
+
+// 6. State and status polling
+app.get('/api/rooms/:code/poll', (req, res) => {
+  const { code } = req.params;
+  const { clientId } = req.query;
+  const room = rooms[code];
+
+  if (!room) {
+    return res.json({ status: 'player_left' });
+  }
+
+  let role = null;
+  if (room.players.A === clientId) role = 'A';
+  else if (room.players.B === clientId) role = 'B';
+
+  if (!role) {
+    return res.status(403).send('Unauthorized to poll this room.');
+  }
+
+  const now = Date.now();
+  room.lastPoll[role] = now;
+
+  // Check if the other player timed out (no poll in 7 seconds)
+  const otherRole = role === 'A' ? 'B' : 'A';
+  const otherClientId = room.players[otherRole];
+  if (otherClientId) {
+    const lastOtherPoll = room.lastPoll[otherRole] || 0;
+    if (now - lastOtherPoll > 7000) {
+      console.log(`Room ${code} destroyed because opponent ${otherClientId} timed out.`);
+      delete rooms[code];
+      return res.json({ status: 'player_left' });
     }
-  });
-  
-  socket.on('update_state', ({ code, state }) => {
-    const room = rooms[code];
-    if (room) {
-      room.state = state;
-      socket.to(code).emit('state_updated', state);
-    }
-  });
-  
-  socket.on('disconnect', () => {
-    console.log('User disconnected:', socket.id);
-    for (const code in rooms) {
-      const room = rooms[code];
-      if (room.players.A === socket.id || room.players.B === socket.id) {
-        io.to(code).emit('player_left');
-        delete rooms[code];
-        console.log(`Room ${code} destroyed because player disconnected.`);
-        broadcastPublicRooms();
-        break;
-      }
-    }
+  }
+
+  // Determine if Player B has joined (from Player A's perspective)
+  const opponentJoined = role === 'A' && room.players.B && (now - (room.lastPoll.B || 0) < 7000);
+
+  res.json({
+    status: room.players.B ? 'connected' : 'waiting',
+    state: room.state,
+    opponentJoined: !!opponentJoined
   });
 });
 
+// Background Garbage Collector: clean rooms inactive for > 15 seconds
+setInterval(() => {
+  const now = Date.now();
+  for (const code in rooms) {
+    const room = rooms[code];
+    const ageA = now - (room.lastPoll.A || 0);
+    const ageB = room.players.B ? (now - (room.lastPoll.B || 0)) : 0;
+    
+    if (ageA > 15000 || (room.players.B && ageB > 15000)) {
+      console.log(`Garbage Collector: Room ${code} cleaned up due to timeout.`);
+      delete rooms[code];
+    }
+  }
+}, 10000);
+
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server listening on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`Express REST Server listening on port ${PORT}`);
 });

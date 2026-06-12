@@ -1,5 +1,13 @@
 import { playNormalCard, playEliteCard, playUnderlayAce, executeCombat, executeAttackPlayer, healCharacter, endTurn, getPlayLimit, canCardAttack } from './gameEngine.js';
 
+function isRankForbidden(rank, turnCount) {
+  if (!rank) return false;
+  if (turnCount === 1 && (rank === 'J' || rank === 'Q' || rank === 'K')) return true;
+  if (turnCount === 2 && (rank === 'Q' || rank === 'K')) return true;
+  if (turnCount === 3 && rank === 'K') return true;
+  return false;
+}
+
 // Main AI trigger called during the gameplay loop when it is B's turn
 export function runAiGameplayTurn(state, updateStateCallback) {
   if (state.phase !== 'GAMEPLAY' || state.activePlayer !== 'B') return;
@@ -19,7 +27,7 @@ export function runAiGameplayTurn(state, updateStateCallback) {
   if (pB.cardsPlayedThisTurn < playLimit && pB.hand.length > 0) {
     // Find a playable card
     // Prioritize Elites, then normal cards
-    const eliteCard = pB.hand.find(c => c.isElite);
+    const eliteCard = pB.hand.find(c => c.isElite && !isRankForbidden(c.rank, currentState.turnCount));
     if (eliteCard) {
       const resultState = playAiElite(currentState, eliteCard);
       if (resultState) {

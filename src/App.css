@@ -785,8 +785,8 @@
   background-color: var(--color-clubs);
 }
 
-/* Responsive adjustments for landscape mobile phones & small screens */
-@media (max-height: 550px) {
+/* Responsive adjustments for mobile phones & small screens */
+@media (max-width: 600px), (max-height: 550px) {
   .welcome-screen {
     padding: 10px;
   }

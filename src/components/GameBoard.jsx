@@ -5,6 +5,14 @@ import { getPlayLimit, canCardAttack } from '../game/gameEngine';
 import { TRANSLATIONS } from '../game/translations';
 import GameLogs from './GameLogs';
 
+function isRankForbidden(rank, turnCount) {
+  if (!rank) return false;
+  if (turnCount === 1 && (rank === 'J' || rank === 'Q' || rank === 'K')) return true;
+  if (turnCount === 2 && (rank === 'Q' || rank === 'K')) return true;
+  if (turnCount === 3 && rank === 'K') return true;
+  return false;
+}
+
 export default function GameBoard({ 
   gameState, 
   onPlayNormal, 
@@ -196,9 +204,14 @@ export default function GameBoard({
         // Dual activation: both powers trigger, but check if we need to stun/heal
         const suit = card.suit;
         if (suit === 'hearts') {
-          // Heal needs target
-          setTargetingMode('HEAL');
-          setSelectedPowerIdx(0); // arbitrary but registers as play
+          // Heal needs target - if board is empty, auto-heal player!
+          if (activePState.board.length === 0) {
+            onPlayNormal(card.id, 0);
+            resetStates();
+          } else {
+            setTargetingMode('HEAL');
+            setSelectedPowerIdx(0); // arbitrary but registers as play
+          }
         } else if (suit === 'spades') {
           // Stun needs target
           const viable = oppPState.board.filter(c => !c.isElite);
@@ -230,8 +243,13 @@ export default function GameBoard({
 
     const suit = selectedHandCard.suit;
     if (suit === 'hearts' && powerIdx === 0) {
-      // Heal needs target
-      setTargetingMode('HEAL');
+      // Heal needs target - if board is empty, auto-heal player!
+      if (activePState.board.length === 0) {
+        onPlayNormal(selectedHandCard.id, powerIdx);
+        resetStates();
+      } else {
+        setTargetingMode('HEAL');
+      }
     } else if (suit === 'spades' && powerIdx === 1) {
       const viable = oppPState.board.filter(c => !c.isElite);
       if (viable.length === 1) {
@@ -615,7 +633,8 @@ export default function GameBoard({
         <div className="hand-container" style={{ transform: 'rotate(0)' }}>
           {pB.hand.map((card, i) => {
             const showBack = gameState.mode === 'ai' ? true : (gameState.mode === 'online' ? (onlineRole !== 'B') : (activePlayer !== 'B'));
-            const isPlayable = activePlayer === 'B' && !winner && (gameState.mode === 'online' ? (onlineRole === 'B') : (gameState.mode !== 'ai')) && pB.cardsPlayedThisTurn < getPlayLimit(pB.lp, pB.has10CardBuff);
+            const isForbidden = !showBack && card.isElite && isRankForbidden(card.rank, turnCount);
+            const isPlayable = activePlayer === 'B' && !winner && (gameState.mode === 'online' ? (onlineRole === 'B') : (gameState.mode !== 'ai')) && pB.cardsPlayedThisTurn < getPlayLimit(pB.lp, pB.has10CardBuff) && !isForbidden;
             return (
               <Card 
                 key={card.id || i} 
@@ -623,6 +642,7 @@ export default function GameBoard({
                 showBack={showBack} 
                 onClick={isPlayable ? () => handleHandCardClick(card) : undefined}
                 isPlayable={isPlayable}
+                isForbidden={isForbidden}
                 language={language}
               />
             );
@@ -639,6 +659,23 @@ export default function GameBoard({
             <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
               {language === 'bg' ? 'Ход' : 'Turn'} {turnCount}
             </div>
+            {turnCount < 4 && (
+              <div style={{
+                fontSize: '0.7rem',
+                color: '#ef4444',
+                fontWeight: '700',
+                background: 'rgba(239, 68, 68, 0.15)',
+                border: '1px solid rgba(239, 68, 68, 0.4)',
+                padding: '2px 8px',
+                borderRadius: '12px',
+                marginTop: '4px',
+                animation: 'pulse-alert 1.5s infinite alternate'
+              }}>
+                🚫 {language === 'bg' 
+                  ? `Забранени: ${turnCount === 1 ? 'J, Q, K' : turnCount === 2 ? 'Q, K' : 'K'}` 
+                  : `Forbidden: ${turnCount === 1 ? 'J, Q, K' : turnCount === 2 ? 'Q, K' : 'K'}`}
+              </div>
+            )}
             <button 
               className={`btn-premium ${isEndTurnPulsing ? 'btn-pulsate' : ''}`}
               disabled={isAiTurn || !!winner || (gameState.mode === 'online' && activePlayer !== onlineRole)}
@@ -656,7 +693,8 @@ export default function GameBoard({
         <div className="hand-container">
           {pA.hand.map((card, i) => {
             const showBack = gameState.mode === 'ai' ? false : (gameState.mode === 'online' ? (onlineRole !== 'A') : (activePlayer !== 'A'));
-            const isPlayable = activePlayer === 'A' && !winner && (gameState.mode === 'online' ? (onlineRole === 'A') : true) && pA.cardsPlayedThisTurn < getPlayLimit(pA.lp, pA.has10CardBuff);
+            const isForbidden = !showBack && card.isElite && isRankForbidden(card.rank, turnCount);
+            const isPlayable = activePlayer === 'A' && !winner && (gameState.mode === 'online' ? (onlineRole === 'A') : true) && pA.cardsPlayedThisTurn < getPlayLimit(pA.lp, pA.has10CardBuff) && !isForbidden;
             return (
               <Card 
                 key={card.id || i} 
@@ -664,6 +702,7 @@ export default function GameBoard({
                 showBack={showBack}
                 onClick={isPlayable ? () => handleHandCardClick(card) : undefined}
                 isPlayable={isPlayable}
+                isForbidden={isForbidden}
                 language={language}
               />
             );

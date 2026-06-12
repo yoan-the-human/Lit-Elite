@@ -294,8 +294,8 @@ export default function EliteDraftPhase({ gameState, onDraftElite, onSelectFinal
             {currentEliteCategory === null ? (language === 'bg' ? 'Изберете категория чрез избиране на карта' : 'Choose Category by Selecting Card') : (language === 'bg' ? `Избирайте от наличните ${currentEliteCategory}` : `Draft From Face-Up ${currentEliteCategory}'s`)}
           </h3>
           <div style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap', marginTop: '20px' }}>
-            {availableElites.map((card) => {
-              const isCurrentCategory = currentEliteCategory === null || card.rank === currentEliteCategory;
+            {(currentEliteCategory === null ? availableElites : availableElites.filter(c => c.rank === currentEliteCategory)).map((card) => {
+              const isCurrentCategory = true;
               let isClickable = isCurrentCategory && isDrafterSelector && !(gameState.mode === 'ai' && currentDrafter === 'B');
               
               // If online mode, only let player draft if it's their turn

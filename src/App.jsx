@@ -7,7 +7,7 @@ import EliteDraftPhase from './components/EliteDraftPhase';
 import GameBoard from './components/GameBoard';
 import GameLogs from './components/GameLogs';
 import TurnOverlay from './components/TurnOverlay';
-import { io } from 'socket.io-client';
+import { PolledSocket } from './game/polledSocket';
 import { TRANSLATIONS } from './game/translations';
 
 // Synthetic sound player
@@ -124,11 +124,7 @@ export default function App() {
     }
     setOnlineStatus('connecting');
     const targetUrl = url || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://lit-elite-server.onrender.com');
-    const newSocket = io(targetUrl, {
-      transports: ['polling', 'websocket'],
-      timeout: 5000,
-      withCredentials: true
-    });
+    const newSocket = new PolledSocket(targetUrl);
 
     socketRef.current = newSocket;
     setSocket(newSocket);

@@ -1,7 +1,7 @@
 import React from 'react';
 import { SUIT_LABELS } from '../game/deckBuilder';
 
-export default function Card({ card, onClick, isPlayable = false, isTargetable = false, isAttackReady = false, showBack = false, language = 'en' }) {
+export default function Card({ card, onClick, isPlayable = false, isTargetable = false, isAttackReady = false, showBack = false, language = 'en', isForbidden = false }) {
   if (showBack) {
     return (
       <div 
@@ -174,6 +174,34 @@ export default function Card({ card, onClick, isPlayable = false, isTargetable =
         <div className="card-stats-row" style={{ justifyContent: 'center' }}>
           <span className="card-stat-hp" title="Health Points">
             ❤️{hp}/{maxHp}
+          </span>
+        </div>
+      )}
+      {/* Forbidden Overlay */}
+      {isForbidden && (
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(0,0,0,0.7)',
+          borderRadius: '8px',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 15,
+          border: '2px dashed #ef4444'
+        }}>
+          <span style={{ fontSize: '1.2rem', marginBottom: '2px' }}>🚫</span>
+          <span style={{
+            color: '#ef4444',
+            fontSize: '0.55rem',
+            fontWeight: '900',
+            letterSpacing: '0.05em',
+            textTransform: 'uppercase',
+            textAlign: 'center',
+            padding: '0 4px'
+          }}>
+            {language === 'bg' ? 'Забранена' : 'Forbidden'}
           </span>
         </div>
       )}
