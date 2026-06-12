@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+## [1.2.0](https://github.com/yoan-the-human/Lit-Elite/compare/v1.0.4...v1.2.0) (2026-06-12)
+
+
+### 🚀 Новости
+
+* Diamond Elites Nerf - they can attack only once ([89ca196](https://github.com/yoan-the-human/Lit-Elite/commit/89ca1961c16a2e43f972287af939e1fd66b304e2))
+
 ### [1.0.4](https://github.com/yoan-the-human/Lit-Elite/compare/v1.0.2...v1.0.4) (2026-06-11)
 
 
