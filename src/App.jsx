@@ -125,7 +125,7 @@ export default function App() {
     setOnlineStatus('connecting');
     const targetUrl = url || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://lit-elite-server.onrender.com');
     const newSocket = io(targetUrl, {
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       timeout: 5000
     });
 

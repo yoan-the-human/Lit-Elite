@@ -87,17 +87,17 @@ export default function GameBoard({
         'Shield: Gain protective bubble'
       ];
       if (rank === 'Q') return isBg ? [
-        'Берсерк и Теглене: Атакувайте два пъти веднага и изтеглете 2 карти',
+        'Берсерк и Теглене: Атакувайте веднага и изтеглете 2 карти',
         'Щит: Вземете предпазен щит'
       ] : [
-        'Haste & Draw: Attack twice immediately and draw 2 cards',
+        'Haste & Draw: Attack immediately and draw 2 cards',
         'Shield: Gain protective bubble'
       ];
       if (rank === 'K') return isBg ? [
-        'Берсерк и Теглене: Атакувайте 3 пъти веднага и изтеглете 3 карти',
+        'Берсерк и Теглене: Атакувайте веднага и изтеглете 3 карти',
         'Щит: Вземете предпазен щит'
       ] : [
-        'Haste & Draw: Attack 3 times immediately and draw 3 cards',
+        'Haste & Draw: Attack immediately and draw 3 cards',
         'Shield: Gain protective bubble'
       ];
       if (rank === 'A') return isBg ? [
@@ -829,10 +829,10 @@ export default function GameBoard({
 
             {(() => {
               const myDeck = activePlayer === 'A' ? pA.deck : pB.deck;
-              const myDefeated = activePlayer === 'A' ? pA.defeated : pB.defeated;
+              const allDefeated = [...pA.defeated, ...pB.defeated];
               
               const eligibleDeckElites = myDeck.filter(c => c.isElite && searchAllowedRanks.includes(c.rank)).map(c => ({ ...c, fromPile: 'deck' }));
-              const eligibleDefeatedElites = myDefeated.filter(c => c.isElite && searchAllowedRanks.includes(c.rank)).map(c => ({ ...c, fromPile: 'defeated' }));
+              const eligibleDefeatedElites = allDefeated.filter(c => c.isElite && searchAllowedRanks.includes(c.rank)).map(c => ({ ...c, fromPile: 'defeated' }));
               
               const eligibleElites = [...eligibleDeckElites, ...eligibleDefeatedElites];
 

@@ -796,15 +796,15 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
         targetElite.shield = true;
         logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
       }
-    } else if (rank === 'Q') {
+     } else if (rank === 'Q') {
       // Queen: [0] Haste & Draw 2, [1] Shield
       if (abilityIdx === 0) {
-        targetElite.maxAttacks = 2;
+        targetElite.maxAttacks = 1;
         targetElite.attackedThisTurn = 0;
         targetElite.hasHaste = true;
         drawCard(state, player);
         drawCard(state, player);
-        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 2 cards and can attack twice immediately.`);
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 2 cards and can attack immediately.`);
       } else {
         targetElite.shield = true;
         logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
@@ -812,13 +812,13 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
     } else if (rank === 'K') {
       // King: [0] Haste & Draw 3, [1] Shield
       if (abilityIdx === 0) {
-        targetElite.maxAttacks = 3;
+        targetElite.maxAttacks = 1;
         targetElite.attackedThisTurn = 0;
         targetElite.hasHaste = true;
         drawCard(state, player);
         drawCard(state, player);
         drawCard(state, player);
-        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 3 cards and can attack 3 times immediately.`);
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 3 cards and can attack immediately.`);
       } else {
         targetElite.shield = true;
         logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
@@ -930,10 +930,16 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
             logEvent(state, `${pState.name} searches deck and draws an Elite card.`);
             update10CardBuff(pState);
           } else {
-            const defIdx = pState.defeated.findIndex(c => c.id === chosenCardId);
+            let defIdx = pState.defeated.findIndex(c => c.id === chosenCardId);
+            let targetDefeatedPile = pState.defeated;
+            if (defIdx === -1) {
+              defIdx = oppState.defeated.findIndex(c => c.id === chosenCardId);
+              targetDefeatedPile = oppState.defeated;
+            }
+
             if (defIdx !== -1) {
-              const cardToDraw = pState.defeated[defIdx];
-              pState.defeated.splice(defIdx, 1);
+              const cardToDraw = targetDefeatedPile[defIdx];
+              targetDefeatedPile.splice(defIdx, 1);
               
               // Reset stats when drawing back
               cardToDraw.atk = cardToDraw.baseAtk;
