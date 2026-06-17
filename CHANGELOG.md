@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [1.4.1](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.0...v1.4.1) (2026-06-17)
+
+
+### 🚀 Новости
+
+* rule book; increased nurfed cards; multiplayer fix ([c8710dc](https://github.com/yoan-the-human/Lit-Elite/commit/c8710dc8d42c937d332303cbf11a9ceca6207166))
+
 ## [1.4.0](https://github.com/yoan-the-human/Lit-Elite/compare/v1.3.0...v1.4.0) (2026-06-12)
 
 
