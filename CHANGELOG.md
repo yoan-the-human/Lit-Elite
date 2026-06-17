@@ -2,6 +2,8 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [1.4.5](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.4...v1.4.5) (2026-06-17)
+
 ### [1.4.4](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.3...v1.4.4) (2026-06-17)
 
 
