@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [1.4.3](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.2...v1.4.3) (2026-06-17)
+
+
+### 🐛 Бъгове
+
+* removed old name from rulebook ([8029fec](https://github.com/yoan-the-human/Lit-Elite/commit/8029fecdb9134c15e7be5fb8037163d5f3d9eeef))
+
 ### [1.4.2](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.1...v1.4.2) (2026-06-17)
 
 
