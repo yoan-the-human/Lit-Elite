@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+## [1.5.0](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.6...v1.5.0) (2026-06-17)
+
+
+### 🚀 Новости
+
+* heart elites and club elites swapped second powers; players cannot hold more htan 10 cards; 10cob buff barriers only normal cards ([db401aa](https://github.com/yoan-the-human/Lit-Elite/commit/db401aa464a3b0a7059b1abdeaf7b0989368c2ba))
+
 ### [1.4.6](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.5...v1.4.6) (2026-06-17)
 
 
