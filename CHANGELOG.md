@@ -2,6 +2,13 @@
 
 Всички забележителни промени в този проект ще бъдат документирани в този файл.
 
+### [1.4.6](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.5...v1.4.6) (2026-06-17)
+
+
+### ⏪ Отменяна
+
+* returned the bonus drawed cards from the diamonds ([451f5f4](https://github.com/yoan-the-human/Lit-Elite/commit/451f5f4b2246b82f7253500fcc898f96eb91ae1a))
+
 ### [1.4.5](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.4...v1.4.5) (2026-06-17)
 
 ### [1.4.4](https://github.com/yoan-the-human/Lit-Elite/compare/v1.4.3...v1.4.4) (2026-06-17)
