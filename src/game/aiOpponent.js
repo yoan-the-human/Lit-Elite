@@ -106,17 +106,13 @@ function playAiElite(state, card) {
       // Ace of Hearts: restore 50 LP
       abilityIdx = 1;
     } else {
-      // J, Q, K: Check if we can mind control a strong enemy card
-      const limit = card.rank === 'J' ? 11 : card.rank === 'Q' ? 12 : 13;
-      const targetCard = oppState.board
-        .filter(c => c.atk <= limit)
-        .sort((a, b) => b.atk - a.atk)[0]; // strongest eligible
-      
-      if (targetCard) {
-        abilityIdx = 0; // Mind control
-        extraParams = { targetId: targetCard.id };
+      // J, Q, K: check if we can resurrect any defeated normal cards
+      const limit = card.rank === 'J' ? 12 : card.rank === 'Q' ? 13 : 14;
+      const eligible = state.defeated.filter(c => !c.isElite && c.value < limit);
+      if (eligible.length > 0) {
+        abilityIdx = 1; // Resurrection
       } else {
-        abilityIdx = 1; // Heal / Damage
+        abilityIdx = 0; // Symmetrical Surge
       }
     }
   } else if (card.suit === 'spades') {
@@ -145,16 +141,17 @@ function playAiElite(state, card) {
         }
       }
     } else {
-      // J, Q, K: Detonate if opponent board has multiple cards, else resurrect Clubs
-      const dmg = card.rank === 'J' ? 12 : card.rank === 'Q' ? 13 : 14;
-      const defeatedClubs = state.defeated.filter(c => c.suit === 'clubs' && !c.isElite && c.value < dmg);
+      // J, Q, K: check if we can mind control
+      const limit = card.rank === 'J' ? 12 : card.rank === 'Q' ? 13 : 14;
+      const targetCard = oppState.board
+        .filter(c => c.atk <= limit)
+        .sort((a, b) => b.atk - a.atk)[0]; // strongest eligible
       
-      if (oppState.board.length >= 2) {
-        abilityIdx = 0; // Deal damage to all
-      } else if (defeatedClubs.length > 0) {
-        abilityIdx = 1; // Resurrect normal clubs
+      if (targetCard) {
+        abilityIdx = 1; // Mind control
+        extraParams = { targetId: targetCard.id };
       } else {
-        abilityIdx = 0; // default to damage
+        abilityIdx = 0; // AOE Damage
       }
     }
   }

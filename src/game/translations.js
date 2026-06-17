@@ -14,7 +14,7 @@ export const TRANSLATIONS = {
     aiDraftsFirst: 'AI Drafts First (Player B)',
     coinFlip: 'Coin Flip (Let Chance Decide)',
     back: '← Back',
-    version: 'Version 1.5.0 • Beta',
+    version: 'Version 1.6.0 • Beta',
     
     // Online Lobby
     createLobby: 'Create Online Room',
@@ -130,7 +130,7 @@ export const TRANSLATIONS = {
     aiDraftsFirst: 'AI избира първи (Играч B)',
     coinFlip: 'Ези или тура (Нека шансът реши)',
     back: '← Назад',
-    version: 'Версия 1.5.0 • Бета',
+    version: 'Версия 1.6.0 • Бета',
     
     // Online Lobby
     createLobby: 'Създай онлайн стая',

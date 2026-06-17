@@ -131,12 +131,13 @@ export default function GameBoard({
         'Symmetrical Health Boost: Both players\' health is increased by 50 LP'
       ];
       const val = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
+      const count = rank === 'J' ? 2 : rank === 'Q' ? 3 : 4;
       return isBg ? [
-        `Контрол на ума: Поемете контрол над вражеска карта с атака <= ${limitForRank(rank)}`,
-        `Симетричен прилив: Излекувайте приятелските карти с ${val} И нанесете ${val} щети на вражеските LP`
+        `Симетричен прилив: Излекувайте приятелските карти с ${val} И нанесете ${val} щети на вражеските LP`,
+        `Възкресение: Възкресете ${count} победени нормални карти (започвайки от най-силната)`
       ] : [
-        `Mind Control: Take control of enemy card with ATK <= ${limitForRank(rank)}`,
-        `Symmetrical Surge: Heal friendly characters by ${val} AND deal ${val} damage to enemy LP`
+        `Symmetrical Surge: Heal friendly characters by ${val} AND deal ${val} damage to enemy LP`,
+        `Resurrection: Resurrect ${count} defeated normal cards (starting from the strongest)`
       ];
     }
     if (suit === 'spades') {
@@ -168,13 +169,12 @@ export default function GameBoard({
         'Board Wipe: Defeat all cards on board for both players'
       ];
       const dmg = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
-      const count = rank === 'J' ? 2 : rank === 'Q' ? 3 : 4;
       return isBg ? [
         `Детонация: Нанесете ${dmg} щети на всички вражески карти на борда`,
-        `Призоваване: Възкресете ${count} победени нормални карти Спатия`
+        `Контрол на ума: Поемете контрол над вражеска карта с атака <= ${limitForRank(rank)}`
       ] : [
         `Detonation: Deal ${dmg} damage to all enemy board cards`,
-        `Summon: Resurrect ${count} defeated normal Clubs cards`
+        `Mind Control: Take control of enemy card with ATK <= ${limitForRank(rank)}`
       ];
     }
     return [];
@@ -292,16 +292,16 @@ export default function GameBoard({
       return;
     }
 
-    // Heart mind control (index 0 for J, Q, K)
-    if (suit === 'hearts' && rank !== 'A' && abilityIdx === 0) {
+    // Club mind control (index 1 for J, Q, K)
+    if (suit === 'clubs' && rank !== 'A' && abilityIdx === 1) {
       const viable = getViableMindControlTargets(selectedHandCard);
       if (viable.length === 1) {
-        onPlayElite(selectedHandCard.id, 0, { targetId: viable[0].id });
+        onPlayElite(selectedHandCard.id, 1, { targetId: viable[0].id });
         resetStates();
       } else if (viable.length > 1) {
         setTargetingMode('MIND_CONTROL');
       } else {
-        onPlayElite(selectedHandCard.id, 0);
+        onPlayElite(selectedHandCard.id, 1);
         resetStates();
       }
       return;
@@ -354,9 +354,9 @@ export default function GameBoard({
         const limit = limitForRank(activeElite.rank);
         if (card.atk <= limit) {
           if (pendingUnderlayAce) {
-            onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 0, { targetId: card.id });
+            onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 1, { targetId: card.id });
           } else {
-            onPlayElite(selectedHandCard.id, 0, { targetId: card.id });
+            onPlayElite(selectedHandCard.id, 1, { targetId: card.id });
           }
           resetStates();
         }
@@ -424,15 +424,15 @@ export default function GameBoard({
       return;
     }
 
-    if (pendingUnderlayAce.suit === 'hearts' && abilityIdx === 0) {
+    if (pendingUnderlayAce.suit === 'clubs' && abilityIdx === 1) {
       const viable = getViableMindControlTargets(selectedEliteForUnderlay);
       if (viable.length === 1) {
-        onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 0, { targetId: viable[0].id });
+        onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 1, { targetId: viable[0].id });
         resetStates();
       } else if (viable.length > 1) {
         setTargetingMode('MIND_CONTROL');
       } else {
-        onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 0);
+        onPlayUnderlay(pendingUnderlayAce.id, selectedEliteForUnderlay.id, 1);
         resetStates();
       }
       return;

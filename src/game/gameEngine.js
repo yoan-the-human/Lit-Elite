@@ -108,9 +108,11 @@ export function checkBoardBarrierBuff(state, player) {
     if (!pState.hasBoardBarrierBuff) {
       pState.hasBoardBarrierBuff = true;
       pState.board.forEach(card => {
-        card.shield = true;
+        if (!card.isElite) {
+          card.shield = true;
+        }
       });
-      logEvent(state, `10-CARDS ON BOARD BUFF! All friendly board cards gain a protective barrier!`);
+      logEvent(state, `10-CARDS ON BOARD BUFF! All friendly normal board cards gain a protective barrier!`);
     }
   } else if (boardSize <= 6) {
     if (pState.hasBoardBarrierBuff) {
@@ -123,6 +125,11 @@ export function checkBoardBarrierBuff(state, player) {
 // Draw card function
 export function drawCard(state, player) {
   const pState = state.players[player];
+  
+  if (pState.hand.length >= 10) {
+    logEvent(state, `${pState.name} has 10 cards in hand and skips drawing.`);
+    return;
+  }
   
   if (pState.deck.length === 0) {
     // Defeated Pile (FIFO Queue) draw
@@ -897,32 +904,10 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
     }
   } else if (suit === 'hearts') {
     if (rank === 'J' || rank === 'Q' || rank === 'K') {
-      // Mind control limit: J <= 12, Q <= 13, K <= 14
-      const limit = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
-      // [0] Mind Control, [1] Heal 12/13/14 AND Damage 12/13/14
+      const val = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
+      const count = rank === 'J' ? 2 : rank === 'Q' ? 3 : 4;
+      // [0] Heal & Damage, [1] Resurrect
       if (abilityIdx === 0) {
-        if (extraParams && extraParams.targetId) {
-          const ecIdx = oppState.board.findIndex(c => c.id === extraParams.targetId);
-          if (ecIdx !== -1) {
-            const enemyCard = oppState.board[ecIdx];
-            if (enemyCard.atk <= limit) {
-              if (enemyCard.shield) {
-                enemyCard.shield = false;
-                logEvent(state, `Mind Control on ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()} is blocked by Shield! Shield is removed.`);
-              } else {
-                oppState.board.splice(ecIdx, 1);
-                // Clean up tanks before joining new board (keep stun status)
-                enemyCard.isTank = false;
-                // Mind controlled card gets summoning sickness on new owner's board
-                enemyCard.playedThisTurn = true;
-                pState.board.push(enemyCard);
-                logEvent(state, `MIND CONTROL! Steals enemy card ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()}`);
-              }
-            }
-          }
-        }
-      } else {
-        const val = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
         logEvent(state, `Hearts healing/damage: heals friendly by ${val}, damages opponent LP by ${val}.`);
         
         // Heal player LP
@@ -938,6 +923,37 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
           state.winner = player;
           state.phase = 'GAME_OVER';
           logEvent(state, `${oppState.name} has fallen! Game Over.`);
+        }
+      } else {
+        // Resurrection: any defeated normal card (starting from the strongest) with value < val
+        const allDefeated = state.defeated.map(c => ({ card: c }));
+        const eligible = allDefeated
+          .filter(entry => !entry.card.isElite && entry.card.value < val)
+          .sort((a, b) => b.card.value - a.card.value);
+        
+        let summoned = 0;
+        for (let i = 0; i < count; i++) {
+          if (eligible.length > summoned) {
+            const { card: resCard } = eligible[summoned++];
+            const idx = state.defeated.findIndex(c => c.id === resCard.id);
+            if (idx !== -1) {
+              state.defeated.splice(idx, 1);
+              
+              resCard.atk = resCard.baseAtk;
+              resCard.hp = resCard.baseHp;
+              resCard.maxHp = resCard.baseHp;
+              resCard.shield = false;
+              resCard.isTank = false;
+              resCard.stunnedTurns = 0;
+              resCard.underlays = [];
+              resCard.playedThisTurn = true; // summoning sickness
+              resCard.attackedThisTurn = 0;
+              resCard.hasHaste = false;
+              
+              pState.board.push(resCard);
+              logEvent(state, `Summons defeated normal card: ${resCard.suit.toUpperCase()} ${resCard.value} to board.`);
+            }
+          }
         }
       }
     } else if (rank === 'A') {
@@ -986,43 +1002,51 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
         if (chosenCardId) {
           const deckIdx = pState.deck.findIndex(c => c.id === chosenCardId);
           if (deckIdx !== -1) {
-            const cardToDraw = pState.deck[deckIdx];
-            pState.deck.splice(deckIdx, 1);
-            pState.hand.push(cardToDraw);
-            logEvent(state, `${pState.name} searches deck and draws an Elite card.`);
-            update10CardBuff(pState);
+            if (pState.hand.length >= 10) {
+              logEvent(state, `${pState.name} has 10 cards in hand and skips drawing.`);
+            } else {
+              const cardToDraw = pState.deck[deckIdx];
+              pState.deck.splice(deckIdx, 1);
+              pState.hand.push(cardToDraw);
+              logEvent(state, `${pState.name} searches deck and draws an Elite card.`);
+              update10CardBuff(pState);
+            }
           } else {
             let defIdx = state.defeated.findIndex(c => c.id === chosenCardId);
 
             if (defIdx !== -1) {
-              const cardToDraw = state.defeated[defIdx];
-              state.defeated.splice(defIdx, 1);
-              
-              // Reset stats when drawing back
-              cardToDraw.atk = cardToDraw.baseAtk;
-              cardToDraw.hp = cardToDraw.baseHp;
-              cardToDraw.maxHp = cardToDraw.baseHp;
-              cardToDraw.shield = false;
-              cardToDraw.isTank = false;
-              cardToDraw.stunnedTurns = 0;
-              cardToDraw.underlays = [];
-              cardToDraw.attackedThisTurn = 0;
-              cardToDraw.hasHaste = false;
-              
-              pState.hand.push(cardToDraw);
-              
-              // Take fatigue damage
-              state.defeatedDrawsCount[player] += 1;
-              const fatigueDamage = state.defeatedDrawsCount[player];
-              pState.lp = Math.max(0, pState.lp - fatigueDamage);
-              
-              logEvent(state, `${pState.name} searches DEFEATED pile and draws an Elite card, taking ${fatigueDamage} fatigue damage!`);
-              update10CardBuff(pState);
-              
-              if (pState.lp <= 0) {
-                state.winner = player === 'A' ? 'B' : 'A';
-                state.phase = 'GAME_OVER';
-                logEvent(state, `${pState.name} died to fatigue damage. Game Over!`);
+              if (pState.hand.length >= 10) {
+                logEvent(state, `${pState.name} has 10 cards in hand and skips drawing.`);
+              } else {
+                const cardToDraw = state.defeated[defIdx];
+                state.defeated.splice(defIdx, 1);
+                
+                // Reset stats when drawing back
+                cardToDraw.atk = cardToDraw.baseAtk;
+                cardToDraw.hp = cardToDraw.baseHp;
+                cardToDraw.maxHp = cardToDraw.baseHp;
+                cardToDraw.shield = false;
+                cardToDraw.isTank = false;
+                cardToDraw.stunnedTurns = 0;
+                cardToDraw.underlays = [];
+                cardToDraw.attackedThisTurn = 0;
+                cardToDraw.hasHaste = false;
+                
+                pState.hand.push(cardToDraw);
+                
+                // Take fatigue damage
+                state.defeatedDrawsCount[player] += 1;
+                const fatigueDamage = state.defeatedDrawsCount[player];
+                pState.lp = Math.max(0, pState.lp - fatigueDamage);
+                
+                logEvent(state, `${pState.name} searches DEFEATED pile and draws an Elite card, taking ${fatigueDamage} fatigue damage!`);
+                update10CardBuff(pState);
+                
+                if (pState.lp <= 0) {
+                  state.winner = player === 'A' ? 'B' : 'A';
+                  state.phase = 'GAME_OVER';
+                  logEvent(state, `${pState.name} died to fatigue damage. Game Over!`);
+                }
               }
             }
           }
@@ -1043,9 +1067,8 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
   } else if (suit === 'clubs') {
     if (rank === 'J' || rank === 'Q' || rank === 'K') {
       // [0] Deal 12/13/14 damage to all enemy board cards (no self-defeat)
-      // [1] Summon 2/3/4 defeated normal Clubs cards (< 12/13/14 value)
+      // [1] Mind Control enemy card (ATK <= 12/13/14)
       const dmg = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
-      const count = rank === 'J' ? 2 : rank === 'Q' ? 3 : 4;
       if (abilityIdx === 0) {
         logEvent(state, `Elite Clubs damage: Deals ${dmg} damage to all enemy board cards.`);
         for (let i = oppState.board.length - 1; i >= 0; i--) {
@@ -1069,36 +1092,26 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
             logEvent(state, `Enemy ${ec.suit.toUpperCase()} ${ec.rank || ec.value} defeated by Elite Clubs!`);
           }
         }
-      } else if (abilityIdx === 1) {
-        // Summon defeated normal Clubs from both players
-        const allDefeated = state.defeated.map(c => ({ card: c }));
-        
-        const eligible = allDefeated
-          .filter(entry => entry.card.suit === 'clubs' && !entry.card.isElite && entry.card.value < dmg)
-          .sort((a, b) => b.card.value - a.card.value);
-        
-        let summoned = 0;
-        for (let i = 0; i < count; i++) {
-          if (eligible.length > summoned) {
-            const { card: resCard } = eligible[summoned++];
-            const idx = state.defeated.findIndex(c => c.id === resCard.id);
-            if (idx !== -1) {
-              state.defeated.splice(idx, 1);
-              
-              // Elites summoning normal clubs keep base stats (strictly less than dmg condition, already normal)
-              resCard.atk = resCard.baseAtk;
-              resCard.hp = resCard.baseHp;
-              resCard.maxHp = resCard.baseHp;
-              resCard.shield = false;
-              resCard.isTank = false;
-              resCard.stunnedTurns = 0;
-              resCard.underlays = [];
-              resCard.playedThisTurn = true; // summoning sickness
-              resCard.attackedThisTurn = 0;
-              resCard.hasHaste = false;
-              
-              pState.board.push(resCard);
-              logEvent(state, `Summons defeated Clubs: ${resCard.suit.toUpperCase()} ${resCard.value} to board.`);
+      } else {
+        // Mind Control
+        const limit = rank === 'J' ? 12 : rank === 'Q' ? 13 : 14;
+        if (extraParams && extraParams.targetId) {
+          const ecIdx = oppState.board.findIndex(c => c.id === extraParams.targetId);
+          if (ecIdx !== -1) {
+            const enemyCard = oppState.board[ecIdx];
+            if (enemyCard.atk <= limit) {
+              if (enemyCard.shield) {
+                enemyCard.shield = false;
+                logEvent(state, `Mind Control on ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()} is blocked by Shield! Shield is removed.`);
+              } else {
+                oppState.board.splice(ecIdx, 1);
+                // Clean up tanks before joining new board (keep stun status)
+                enemyCard.isTank = false;
+                // Mind controlled card gets summoning sickness on new owner's board
+                enemyCard.playedThisTurn = true;
+                pState.board.push(enemyCard);
+                logEvent(state, `MIND CONTROL! Steals enemy card ${enemyCard.rank || enemyCard.value} of ${enemyCard.suit.toUpperCase()}`);
+              }
             }
           }
         }

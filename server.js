@@ -1,5 +1,10 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -7,9 +12,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('Lit Elite Multiplayer Polling Server is running!');
-});
+// Serve static files from Vite build
+app.use(express.static(path.join(__dirname, 'dist')));
 
 // rooms store: roomCode -> { players: { A: clientId, B: clientId }, lastPoll: { A: timestamp, B: timestamp }, state: gameState, isPrivate: boolean, startingPlayer: string }
 const rooms = {};
@@ -177,6 +181,14 @@ setInterval(() => {
     }
   }
 }, 10000);
+
+// Fallback route to serve index.html for all non-API GET requests
+app.get('*', (req, res, next) => {
+  if (req.path.startsWith('/api/')) {
+    return next();
+  }
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+});
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {

@@ -323,14 +323,14 @@ When you play an Elite card, you choose one of its **two abilities**. Elite abil
 
 | Rank | ATK/HP | Ability 1 | Ability 2 |
 |---|---|---|---|
-| J | 12/12 | **Mind Control** — Steal an enemy card with ATK ≤ 12. Shield blocks but pops. Stolen card gets summoning sickness. | **Symmetrical Surge** — Heal ALL friendly board cards by 12 AND deal 12 direct damage to opponent |
-| Q | 13/13 | **Mind Control** — Steal enemy card with ATK ≤ 13 | **Symmetrical Surge** — Heal all friendly by 13 AND deal 13 damage to opponent |
-| K | 14/14 | **Mind Control** — Steal enemy card with ATK ≤ 14 | **Symmetrical Surge** — Heal all friendly by 14 AND deal 14 damage to opponent |
+| J | 12/12 | **Symmetrical Surge** — Heal all friendly board cards by 12 AND deal 12 direct damage to opponent | **Resurrection** — Resurrect 2 defeated Normal cards (starting from the strongest, value < 12) from the Defeated Pile |
+| Q | 13/13 | **Symmetrical Surge** — Heal all friendly board cards by 13 AND deal 13 direct damage to opponent | **Resurrection** — Resurrect 3 defeated Normal cards (starting from strongest, value < 13) |
+| K | 14/14 | **Symmetrical Surge** — Heal all friendly board cards by 14 AND deal 14 direct damage to opponent | **Resurrection** — Resurrect 4 defeated Normal cards (starting from strongest, value < 14) |
 | A | 0/0 | **Underlay** — Attach under a board Elite | **Symmetrical Health Boost** — Both players: maxLP += 50, LP += 50 |
 
-> **Example — Mind Control:** You play ♥Q (13/13) with Ability 1 targeting enemy ♦10 (ATK 10, no shield). Since 10 ≤ 13, the ♦10 is stolen and moved to YOUR board. It has summoning sickness (can't attack this turn). If the ♦10 had a Shield, the Mind Control still works but the shield pops off.
+> **Example — Symmetrical Surge:** You play ♥Q (13/13) with Ability 1. All your friendly board cards heal 13 HP, and your opponent takes 13 direct LP damage.
 
-> **Example — Symmetrical Surge:** You play ♥K (14/14) with Ability 2. All your board cards heal 14 HP, and your opponent takes 14 direct LP damage. If your opponent has 12 LP — they're dead!
+> **Example — Resurrection:** You play ♥K (14/14) with Ability 2. You resurrect up to 4 defeated Normal cards (of any suit) from the Defeated Pile to your board, starting from the strongest normal cards.
 
 > **Example — Heart Ace Ability 2:** You play ♥A with its second ability. Both players' maxLP increases by 50 (150 → 200) and their current LP increases by 50. This extends the game and opens new strategic possibilities.
 
@@ -353,14 +353,14 @@ When you play an Elite card, you choose one of its **two abilities**. Elite abil
 
 | Rank | ATK/HP | Ability 1 | Ability 2 |
 |---|---|---|---|
-| J | 12/12 | **Mass Detonation** — Deal 12 damage to ALL enemy board cards (card stays on board, no self-destruct!) | **Summon** — Resurrect 2 defeated Normal Clubs cards (value < 12) from the Defeated Pile |
-| Q | 13/13 | **Mass Detonation** — Deal 13 to all enemy board | **Summon** — Resurrect 3 defeated Normal Clubs (value < 13) |
-| K | 14/14 | **Mass Detonation** — Deal 14 to all enemy board | **Summon** — Resurrect 4 defeated Normal Clubs (value < 14) |
+| J | 12/12 | **Mass Detonation** — Deal 12 damage to ALL enemy board cards (card stays on board, no self-destruct!) | **Mind Control** — Steal an enemy card with ATK ≤ 12. Shield blocks but pops. Stolen card gets summoning sickness. |
+| Q | 13/13 | **Mass Detonation** — Deal 13 to all enemy board | **Mind Control** — Steal enemy card with ATK ≤ 13 |
+| K | 14/14 | **Mass Detonation** — Deal 14 to all enemy board | **Mind Control** — Steal enemy card with ATK ≤ 14 |
 | A | 0/0 | **Underlay** — Attach under a board Elite | **Board Wipe** — ALL cards on BOTH boards are sent to the Defeated Pile |
 
 > **Example — Mass Detonation:** You play ♣K (14/14) with Ability 1. Every enemy board card takes 14 damage. Most Normal cards will be obliterated. AND the ♣K stays on your board as a 14/14 body — unlike Normal Kamikaze!
 
-> **Example — Summon:** You play ♣Q (13/13) with Ability 2. You pull 3 defeated Normal Clubs cards (value < 13) from the Defeated Pile to your board. Instant army!
+> **Example — Mind Control:** You play ♣Q (13/13) with Ability 2 targeting enemy ♦10 (ATK 10, no shield). Since 10 ≤ 13, the ♦10 is stolen and moved to YOUR board. It has summoning sickness (can't attack this turn). If the ♦10 had a Shield, the Mind Control still works but the shield pops off.
 
 > **Example — Board Wipe (Ace):** You play ♣A with Ability 2. EVERY card on both boards is destroyed and sent to the Defeated Pile. Total annihilation. The ♣A itself goes to the Defeated Pile too.
 
@@ -485,11 +485,11 @@ A defensive bonus triggered by board presence.
 
 | Condition | Effect |
 |---|---|
-| Board has **≥ 10 cards** | **Activates:** ALL friendly board cards gain Shield |
+| Board has **≥ 10 cards** | **Activates:** ALL friendly normal board cards gain Shield (Elite cards do NOT gain Shield from this buff) |
 | Board drops to **≤ 6 cards** | **Deactivates:** No new shields granted (shields already on cards remain until popped) |
 | Board has **7–9 cards** | **Hysteresis zone:** No change in state |
 
-> **Example:** You have 9 cards on board (no buff). You summon a 10th card → Board Barrier activates! All 10 of your board cards gain Shield. Then 3 are destroyed (7 on board) — you're in the hysteresis zone, buff stays active but no new shields granted. If another is destroyed (6 on board), the buff deactivates — but shields already on cards remain.
+> **Example:** You have 9 cards on board (no buff). You summon a 10th card (a normal card) → Board Barrier activates! All normal board cards on your board gain Shield. Then 3 are destroyed (7 on board) — you're in the hysteresis zone, buff stays active but no new shields granted. If another is destroyed (6 on board), the buff deactivates — but shields already on cards remain.
 
 ### 12.3 Fatigue Draw (Empty Deck)
 
