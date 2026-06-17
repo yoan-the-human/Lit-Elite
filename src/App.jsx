@@ -7,6 +7,7 @@ import EliteDraftPhase from './components/EliteDraftPhase';
 import GameBoard from './components/GameBoard';
 import GameLogs from './components/GameLogs';
 import TurnOverlay from './components/TurnOverlay';
+import RuleBook from './components/RuleBook';
 import { PolledSocket } from './game/polledSocket';
 import { TRANSLATIONS } from './game/translations';
 
@@ -75,6 +76,7 @@ export default function App() {
   const [isTurnHandoffActive, setIsTurnHandoffActive] = useState(false);
   const [showAiFirstChoice, setShowAiFirstChoice] = useState(false);
   const [language, setLanguage] = useState('en');
+  const [isRuleBookOpen, setIsRuleBookOpen] = useState(false);
   const [socket, setSocket] = useState(null);
   const [roomCode, setRoomCode] = useState('');
   const [onlineRole, setOnlineRole] = useState(null);
@@ -726,9 +728,25 @@ export default function App() {
           </div>
         )}
         
-        <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
+        {!showAiFirstChoice && onlineStatus === 'idle' && (
+          <button 
+            className="btn-premium"
+            style={{ 
+              marginTop: '24px', 
+              background: 'rgba(99, 102, 241, 0.15)', 
+              borderColor: 'rgba(99, 102, 241, 0.4)',
+              textShadow: '0 0 8px rgba(99, 102, 241, 0.5)'
+            }}
+            onClick={() => setIsRuleBookOpen(true)}
+          >
+            📚 {language === 'bg' ? 'Правила на играта' : 'Game Rules'}
+          </button>
+        )}
+
+        <div style={{ color: 'var(--text-dim)', fontSize: '0.8rem', marginTop: '16px' }}>
           {t.version}
         </div>
+        <RuleBook isOpen={isRuleBookOpen} onClose={() => setIsRuleBookOpen(false)} language={language} />
       </div>
     );
   }
@@ -822,7 +840,9 @@ export default function App() {
         onEndTurn={handleEndTurn}
         onlineRole={onlineRole}
         language={language}
+        onOpenRuleBook={() => setIsRuleBookOpen(true)}
       />
+      <RuleBook isOpen={isRuleBookOpen} onClose={() => setIsRuleBookOpen(false)} language={language} />
     </div>
   );
 }

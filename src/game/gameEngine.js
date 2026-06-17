@@ -570,6 +570,12 @@ export function playNormalCard(state, cardId, powerIndex, targetInfo = null) {
   if (cardIdx === -1) return state;
   const card = pState.hand[cardIdx];
   
+  // Enforce forbidden normal card turn restrictions (Turn 1 blocks normal 10s)
+  if (state.turnCount === 1 && card.value === 10) {
+    logEvent(state, `Forbidden: Cannot play normal card 10 on turn 1!`);
+    return state;
+  }
+  
   // Resolve powers
   const isDual = pState.has10CardBuff;
   
@@ -736,12 +742,16 @@ export function playEliteCard(state, cardId, chosenAbilityIndex, extraParams = n
     logEvent(state, `Forbidden: Cannot play ${card.rank} on turn 1!`);
     return state;
   }
-  if (state.turnCount === 2 && (card.rank === 'Q' || card.rank === 'K')) {
+  if (state.turnCount === 2 && (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K')) {
     logEvent(state, `Forbidden: Cannot play ${card.rank} on turn 2!`);
     return state;
   }
-  if (state.turnCount === 3 && card.rank === 'K') {
-    logEvent(state, `Forbidden: Cannot play K on turn 3!`);
+  if (state.turnCount === 3 && (card.rank === 'Q' || card.rank === 'K')) {
+    logEvent(state, `Forbidden: Cannot play ${card.rank} on turn 3!`);
+    return state;
+  }
+  if (state.turnCount === 4 && card.rank === 'K') {
+    logEvent(state, `Forbidden: Cannot play K on turn 4!`);
     return state;
   }
   

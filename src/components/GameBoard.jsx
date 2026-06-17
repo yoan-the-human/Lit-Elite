@@ -5,11 +5,16 @@ import { getPlayLimit, canCardAttack } from '../game/gameEngine';
 import { TRANSLATIONS } from '../game/translations';
 import GameLogs from './GameLogs';
 
-function isRankForbidden(rank, turnCount) {
-  if (!rank) return false;
-  if (turnCount === 1 && (rank === 'J' || rank === 'Q' || rank === 'K')) return true;
-  if (turnCount === 2 && (rank === 'Q' || rank === 'K')) return true;
-  if (turnCount === 3 && rank === 'K') return true;
+function isCardForbidden(card, turnCount) {
+  if (!card || turnCount > 4) return false;
+  if (card.rank === 'A') return false;
+  if (turnCount === 1 && !card.isElite && card.value === 10) return true;
+  if (card.isElite) {
+    if (turnCount === 1 && (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K')) return true;
+    if (turnCount === 2 && (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K')) return true;
+    if (turnCount === 3 && (card.rank === 'Q' || card.rank === 'K')) return true;
+    if (turnCount === 4 && card.rank === 'K') return true;
+  }
   return false;
 }
 
@@ -22,7 +27,8 @@ export default function GameBoard({
   onAttackPlayer, 
   onEndTurn,
   language = 'en',
-  onlineRole = null
+  onlineRole = null,
+  onOpenRuleBook
 }) {
   const t = TRANSLATIONS[language] || TRANSLATIONS.en;
   const { players, activePlayer, turnCount, winner } = gameState;
@@ -633,7 +639,7 @@ export default function GameBoard({
         <div className="hand-container" style={{ transform: 'rotate(0)' }}>
           {pB.hand.map((card, i) => {
             const showBack = gameState.mode === 'ai' ? true : (gameState.mode === 'online' ? (onlineRole !== 'B') : (activePlayer !== 'B'));
-            const isForbidden = !showBack && card.isElite && isRankForbidden(card.rank, turnCount);
+            const isForbidden = !showBack && isCardForbidden(card, turnCount);
             const isPlayable = activePlayer === 'B' && !winner && (gameState.mode === 'online' ? (onlineRole === 'B') : (gameState.mode !== 'ai')) && pB.cardsPlayedThisTurn < getPlayLimit(pB.lp, pB.has10CardBuff) && !isForbidden;
             return (
               <Card 
@@ -659,7 +665,7 @@ export default function GameBoard({
             <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)' }}>
               {language === 'bg' ? 'Ход' : 'Turn'} {turnCount}
             </div>
-            {turnCount < 4 && (
+            {turnCount <= 4 && (
               <div style={{
                 fontSize: '0.7rem',
                 color: '#ef4444',
@@ -668,12 +674,11 @@ export default function GameBoard({
                 border: '1px solid rgba(239, 68, 68, 0.4)',
                 padding: '2px 8px',
                 borderRadius: '12px',
-                marginTop: '4px',
-                animation: 'pulse-alert 1.5s infinite alternate'
+                marginTop: '4px'
               }}>
                 🚫 {language === 'bg' 
-                  ? `Забранени: ${turnCount === 1 ? 'J, Q, K' : turnCount === 2 ? 'Q, K' : 'K'}` 
-                  : `Forbidden: ${turnCount === 1 ? 'J, Q, K' : turnCount === 2 ? 'Q, K' : 'K'}`}
+                  ? `Забранени: ${turnCount === 1 ? '10, J, Q, K' : turnCount === 2 ? 'J, Q, K' : turnCount === 3 ? 'Q, K' : 'K'}` 
+                  : `Forbidden: ${turnCount === 1 ? '10, J, Q, K' : turnCount === 2 ? 'J, Q, K' : turnCount === 3 ? 'Q, K' : 'K'}`}
               </div>
             )}
             <button 
@@ -693,7 +698,7 @@ export default function GameBoard({
         <div className="hand-container">
           {pA.hand.map((card, i) => {
             const showBack = gameState.mode === 'ai' ? false : (gameState.mode === 'online' ? (onlineRole !== 'A') : (activePlayer !== 'A'));
-            const isForbidden = !showBack && card.isElite && isRankForbidden(card.rank, turnCount);
+            const isForbidden = !showBack && isCardForbidden(card, turnCount);
             const isPlayable = activePlayer === 'A' && !winner && (gameState.mode === 'online' ? (onlineRole === 'A') : true) && pA.cardsPlayedThisTurn < getPlayLimit(pA.lp, pA.has10CardBuff) && !isForbidden;
             return (
               <Card 
@@ -775,6 +780,23 @@ export default function GameBoard({
 
         {/* Battle Feed Logs under fatigue draw count */}
         <GameLogs logs={gameState.logs} language={language} isEmbedded={true} />
+        
+        {/* Rules button */}
+        <button 
+          className="btn-premium"
+          onClick={onOpenRuleBook}
+          style={{
+            margin: '12px auto',
+            width: 'calc(100% - 32px)',
+            justifyContent: 'center',
+            fontSize: '0.85rem',
+            padding: '8px 16px',
+            background: 'rgba(99, 102, 241, 0.1)',
+            borderColor: 'rgba(99, 102, 241, 0.25)'
+          }}
+        >
+          📚 {language === 'bg' ? 'Правила' : 'Rules'}
+        </button>
       </div>
 
       {/* Normal Card Power Choice Modal */}

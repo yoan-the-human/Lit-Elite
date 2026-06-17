@@ -1,10 +1,15 @@
 import { playNormalCard, playEliteCard, playUnderlayAce, executeCombat, executeAttackPlayer, healCharacter, endTurn, getPlayLimit, canCardAttack } from './gameEngine.js';
 
-function isRankForbidden(rank, turnCount) {
-  if (!rank) return false;
-  if (turnCount === 1 && (rank === 'J' || rank === 'Q' || rank === 'K')) return true;
-  if (turnCount === 2 && (rank === 'Q' || rank === 'K')) return true;
-  if (turnCount === 3 && rank === 'K') return true;
+function isCardForbidden(card, turnCount) {
+  if (!card || turnCount > 4) return false;
+  if (card.rank === 'A') return false;
+  if (turnCount === 1 && !card.isElite && card.value === 10) return true;
+  if (card.isElite) {
+    if (turnCount === 1 && (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K')) return true;
+    if (turnCount === 2 && (card.rank === 'J' || card.rank === 'Q' || card.rank === 'K')) return true;
+    if (turnCount === 3 && (card.rank === 'Q' || card.rank === 'K')) return true;
+    if (turnCount === 4 && card.rank === 'K') return true;
+  }
   return false;
 }
 
@@ -27,7 +32,7 @@ export function runAiGameplayTurn(state, updateStateCallback) {
   if (pB.cardsPlayedThisTurn < playLimit && pB.hand.length > 0) {
     // Find a playable card
     // Prioritize Elites, then normal cards
-    const eliteCard = pB.hand.find(c => c.isElite && !isRankForbidden(c.rank, currentState.turnCount));
+    const eliteCard = pB.hand.find(c => c.isElite && !isCardForbidden(c, currentState.turnCount));
     if (eliteCard) {
       const resultState = playAiElite(currentState, eliteCard);
       if (resultState) {
@@ -36,7 +41,7 @@ export function runAiGameplayTurn(state, updateStateCallback) {
       }
     }
 
-    const normalCard = pB.hand.find(c => !c.isElite);
+    const normalCard = pB.hand.find(c => !c.isElite && !isCardForbidden(c, currentState.turnCount));
     if (normalCard) {
       const resultState = playAiNormal(currentState, normalCard);
       if (resultState) {
