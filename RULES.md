@@ -310,11 +310,12 @@ When you play an Elite card, you choose one of its **two abilities**. Elite abil
 | Rank | ATK/HP | Ability 1 | Ability 2 |
 |---|---|---|---|
 | J | 12/12 | **Haste + Draw 1** — Can attack this turn AND draw 1 card | **Shield** — Gain a protective Shield bubble |
-| Q | 13/13 | **Haste + Draw 2** — Can attack this turn AND draw 2 cards | **Shield** — Gain a protective Shield bubble |
-| K | 14/14 | **Haste + Draw 3** — Can attack this turn AND draw 3 cards | **Shield** — Gain a protective Shield bubble |
+| Q | 13/13 | **Haste + Draw 1** — Can attack this turn AND draw 1 card | **Shield** — Gain a protective Shield bubble |
+| K | 14/14 | **Haste + Draw 1** — Can attack this turn AND draw 1 card | **Shield** — Gain a protective Shield bubble |
 | A | 0/0 | **Underlay** — Attach under a board Elite (see [Ace Underlay](#10-ace-underlay-system)) | **Symmetrical Draw** — BOTH players draw 4 cards |
 
-> **Example:** You play ♦Q with Ability 1. The ♦Q (13/13) is placed on your board with Haste — it can attack this turn! You also draw 2 cards. Massive tempo swing!
+> **Example:** You play ♦Q with Ability 1. The ♦Q (13/13) is placed on your board with Haste — it can attack this turn! You also draw 1 card. Massive tempo swing!
+
 
 > **Example:** You play ♦K with Ability 2. The ♦K (14/14) is placed on your board with a Shield. Enemy attacks must pop the shield before dealing HP damage.
 

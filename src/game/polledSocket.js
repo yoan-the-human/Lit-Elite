@@ -11,11 +11,19 @@ export class PolledSocket {
     
     console.log(`[PolledSocket] Initializing with client ID: ${this.clientId} to server: ${url}`);
     
-    // Mimic async connection delay
-    setTimeout(() => {
-      this.isConnected = true;
-      this.trigger('connect');
-    }, 100);
+    // Verify connection to server
+    fetch(`${url}/api/lobby`)
+      .then(res => {
+        if (res.ok) {
+          this.isConnected = true;
+          this.trigger('connect');
+        } else {
+          this.trigger('connect_error');
+        }
+      })
+      .catch(err => {
+        this.trigger('connect_error');
+      });
   }
 
   on(event, callback) {
@@ -83,9 +91,12 @@ export class PolledSocket {
       if (res.ok) {
         const list = await res.json();
         this.trigger('public_rooms_list', list);
+      } else {
+        this.trigger('connect_error');
       }
     } catch (err) {
       console.error('[PolledSocket] Error fetching public rooms:', err);
+      this.trigger('connect_error');
     }
   }
 

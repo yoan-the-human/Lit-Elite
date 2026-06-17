@@ -71,6 +71,17 @@ function playSound(type) {
   }
 }
 
+const getDefaultServerUrl = () => {
+  const hostname = window.location.hostname;
+  const isLocal = hostname === 'localhost' || 
+                  hostname === '127.0.0.1' || 
+                  hostname === '[::1]' || 
+                  hostname.startsWith('192.168.') || 
+                  hostname.startsWith('10.') || 
+                  hostname.startsWith('172.');
+  return isLocal ? `http://${hostname}:3001` : 'https://lit-elite-server.onrender.com';
+};
+
 export default function App() {
   const [gameState, setGameState] = useState(null);
   const [isTurnHandoffActive, setIsTurnHandoffActive] = useState(false);
@@ -82,7 +93,7 @@ export default function App() {
   const [onlineRole, setOnlineRole] = useState(null);
   const [onlineStatus, setOnlineStatus] = useState('idle'); // 'idle', 'connecting', 'connected', 'waiting', 'error'
   const [lobbyCodeInput, setLobbyCodeInput] = useState('');
-  const [serverUrl, setServerUrl] = useState('https://lit-elite-server.onrender.com');
+  const [serverUrl, setServerUrl] = useState(getDefaultServerUrl());
   const [lobbyView, setLobbyView] = useState('menu'); // 'menu', 'create', 'join'
   const [isRoomPrivate, setIsRoomPrivate] = useState(true);
   const [publicRooms, setPublicRooms] = useState([]);
@@ -125,7 +136,7 @@ export default function App() {
       socketRef.current.disconnect();
     }
     setOnlineStatus('connecting');
-    const targetUrl = url || (window.location.hostname === 'localhost' ? 'http://localhost:3001' : 'https://lit-elite-server.onrender.com');
+    const targetUrl = url || getDefaultServerUrl();
     const newSocket = new PolledSocket(targetUrl);
 
     socketRef.current = newSocket;
