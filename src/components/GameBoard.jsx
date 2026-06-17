@@ -101,17 +101,17 @@ export default function GameBoard({
         'Shield: Gain protective bubble'
       ];
       if (rank === 'Q') return isBg ? [
-        'Берсерк и Теглене: Атакувайте веднага и изтеглете 1 карта',
+        'Берсерк и Теглене: Атакувайте веднага и изтеглете 2 карти',
         'Щит: Вземете предпазен щит'
       ] : [
-        'Haste & Draw: Attack immediately and draw 1 card',
+        'Haste & Draw: Attack immediately and draw 2 cards',
         'Shield: Gain protective bubble'
       ];
       if (rank === 'K') return isBg ? [
-        'Берсерк и Теглене: Атакувайте веднага и изтеглете 1 карта',
+        'Берсерк и Теглене: Атакувайте веднага и изтеглете 3 карти',
         'Щит: Вземете предпазен щит'
       ] : [
-        'Haste & Draw: Attack immediately and draw 1 card',
+        'Haste & Draw: Attack immediately and draw 3 cards',
         'Shield: Gain protective bubble'
       ];
       if (rank === 'A') return isBg ? [

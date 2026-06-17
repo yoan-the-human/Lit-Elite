@@ -857,25 +857,28 @@ function resolveEliteAbility(state, player, targetElite, suit, abilityIdx, extra
         logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
       }
      } else if (rank === 'Q') {
-      // Queen: [0] Haste & Draw 1, [1] Shield
+      // Queen: [0] Haste & Draw 2, [1] Shield
       if (abilityIdx === 0) {
         targetElite.maxAttacks = 1;
         targetElite.attackedThisTurn = 0;
         targetElite.hasHaste = true;
         drawCard(state, player);
-        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 1 card and can attack immediately.`);
+        drawCard(state, player);
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 2 cards and can attack immediately.`);
       } else {
         targetElite.shield = true;
         logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
       }
     } else if (rank === 'K') {
-      // King: [0] Haste & Draw 1, [1] Shield
+      // King: [0] Haste & Draw 3, [1] Shield
       if (abilityIdx === 0) {
         targetElite.maxAttacks = 1;
         targetElite.attackedThisTurn = 0;
         targetElite.hasHaste = true;
         drawCard(state, player);
-        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 1 card and can attack immediately.`);
+        drawCard(state, player);
+        drawCard(state, player);
+        logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} draws 3 cards and can attack immediately.`);
       } else {
         targetElite.shield = true;
         logEvent(state, `${targetElite.rank} of ${targetElite.suit.toUpperCase()} gains a protective shield bubble.`);
