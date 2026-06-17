@@ -5,7 +5,7 @@ export default function RuleBook({ isOpen, onClose, language = 'en' }) {
 
   const t = {
     en: {
-      title: "MORLD — Lit Elite Rules",
+      title: "Lit Elite Rules",
       toc: "Table of Contents",
       close: "Close",
       sections: {
@@ -27,7 +27,7 @@ export default function RuleBook({ isOpen, onClose, language = 'en' }) {
       }
     },
     bg: {
-      title: "ПРАВИЛА НА MORLD — Lit Elite",
+      title: "ПРАВИЛА НА Lit Elite",
       toc: "Съдържание",
       close: "Затвори",
       sections: {
@@ -173,7 +173,7 @@ export default function RuleBook({ isOpen, onClose, language = 'en' }) {
             <h2 style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '8px', marginBottom: '12px' }}>{t.sections.overview}</h2>
             {language === 'bg' ? (
               <div>
-                <p><strong>MORLD — Lit Elite</strong> е стратегическа игра с карти за 2 играчи (1 срещу 1). Целта ви е да свалите жизнените точки (LP) на опонента до 0.</p>
+                <p><strong>Lit Elite</strong> е стратегическа игра с карти за 2 играчи (1 срещу 1). Целта ви е да свалите жизнените точки (LP) на опонента до 0.</p>
                 <ul>
                   <li><strong>Начални жизнени точки (LP):</strong> 150 (максимум 150, може да бъде увеличен чрез Асо Купа).</li>
                   <li><strong>Режими на игра:</strong> Локален (Hotseat), Срещу компютър (AI) и Онлайн мултиплейър.</li>
@@ -181,7 +181,7 @@ export default function RuleBook({ isOpen, onClose, language = 'en' }) {
               </div>
             ) : (
               <div>
-                <p><strong>MORLD — Lit Elite</strong> is a strategic 1v1 card battle game. Your goal is to reduce your opponent's Life Points (LP) to 0.</p>
+                <p><strong>Lit Elite</strong> is a strategic 1v1 card battle game. Your goal is to reduce your opponent's Life Points (LP) to 0.</p>
                 <ul>
                   <li><strong>Starting LP:</strong> 150 (max LP: 150, can be increased via Ace of Hearts).</li>
                   <li><strong>Game Modes:</strong> Pass & Play (Hotseat), vs AI, and Online Multiplayer.</li>
