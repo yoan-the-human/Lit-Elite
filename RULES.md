@@ -1,4 +1,4 @@
-# 🃏 MORLD — Lit Elite: Official Rule Book
+# 🃏 Lit Elite: Official Rule Book
 
 > *"In the world of Lit Elite, every card is a weapon, every play is a gamble, and every turn could be your last."*
 
@@ -27,7 +27,7 @@
 
 ## 1. Game Overview
 
-**Morld — Lit Elite** is a strategic 1v1 card battle game where two players clash in a battle of wits, timing, and card mastery. Your goal is simple: **reduce your opponent's Life Points (LP) to zero**.
+**Lit Elite** is a strategic 1v1 card battle game where two players clash in a battle of wits, timing, and card mastery. Your goal is simple: **reduce your opponent's Life Points (LP) to zero**.
 
 ### Key Facts
 
