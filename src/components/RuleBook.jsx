@@ -239,7 +239,6 @@ export default function RuleBook({ isOpen, onClose, language = 'en' }) {
                 <ol>
                   <li><strong>Нормален Драфт (4 рунда):</strong> Избират се подсекции от нормални карти (четни и нечетни от всяка боя). Модел на избор: Играч 1 избира 1 подсекция → Играч 2 избира 2 подсекции → Последната се приписва автоматично на Играч 1.</li>
                   <li><strong>Елитен Драфт (4 рунда):</strong> Избират се елитни карти. Всеки рунд един от играчите избира боя/ранг категория, опонентът взема 2 карти от нея, а останалата отива при избиращия.</li>
-                  <li><strong>Краен избор на Елити:</strong> От 8-те си драфтнати елити, всеки играч трябва да избере точно 4 (по един от всеки ранг: J, Q, K, A) за своето тесте.</li>
                 </ol>
               </div>
             ) : (
@@ -248,7 +247,6 @@ export default function RuleBook({ isOpen, onClose, language = 'en' }) {
                 <ol>
                   <li><strong>Normal Draft (4 rounds):</strong> Select subsections of normal cards (odd and even groups of each suit). Selection pattern: Player 1 picks 1 subsection → Player 2 picks 2 subsections → Player 1 receives the remaining subsection.</li>
                   <li><strong>Elite Draft (4 rounds):</strong> Select elite cards. Each round, one player picks a rank category, the opponent drafts 2 cards from it, and the selector receives the last remaining card.</li>
-                  <li><strong>Final Elite Selection:</strong> From the 8 drafted elites, each player must choose exactly 4 (one of each rank: J, Q, K, A) to put into their deck.</li>
                 </ol>
               </div>
             )}
